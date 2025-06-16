@@ -224,7 +224,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         g_log << "Label ID " << label_id << ": [";
         for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
                 g_log << ops[i];
-                if (i < ops.size() - 1)
+                if (i < static_cast<int>(ops.size()) - 1)
                 g_log << ", ";
             }
             g_log << "]" << endl;
