@@ -152,10 +152,10 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         phmap::flat_hash_map<int, vector<pair<int, int>>> op_to_transitions;
 
         // Collect transitions per op_id
-        for (size_t target = 0; target < graph.size(); ++target) {
+        for (int target = 0; target < static_cast<int>(graph.size()); ++target) {
             for (const Successor &succ : graph[target]) {
                 ++num_transitions_before_lr;
-                op_to_transitions[succ.op].emplace_back(succ.state, (int)target);
+                op_to_transitions[succ.op].emplace_back(succ.state, target);
             }
         }
 
@@ -185,7 +185,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     } else {
         // Map from (src, target) to list of operators
         auto transition_groups = phmap::flat_hash_map<pair<int, int>, vector<int>, SzudzikPairHash>{};
-        for (size_t target = 0; target < graph.size(); ++target) {
+        for (int target = 0; target < static_cast<int>(graph.size()); ++target) {
             for (const Successor &succ : graph[target]) {
                 ++num_transitions_before_lr;
                 transition_groups[{succ.state, target}].push_back(succ.op);
@@ -210,7 +210,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         }
     }
 
-    for (size_t target = 0; target < graph.size(); ++target) {
+    for (int target = 0; target < static_cast<int>(graph.size()); ++target) {
         new_graph[target].shrink_to_fit();
 #ifndef NDEBUG
 		g_log << "Old Graph: " << target << graph[target] << endl;
@@ -221,7 +221,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
 #ifndef NDEBUG
     for (const auto &[label_id, ops] : label_id_to_ops) {
         g_log << "Label ID " << label_id << ": [";
-        for (size_t i = 0; i < ops.size(); ++i) {
+        for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
                 g_log << ops[i];
                 if (i < ops.size() - 1)
                 g_log << ", ";
