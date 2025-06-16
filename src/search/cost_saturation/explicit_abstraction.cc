@@ -129,13 +129,13 @@ int ExplicitAbstraction::create_or_reuse_label(vector<int> &&ops_sorted) {
     if (inserted) {
         this->label_id_to_ops.emplace(it->second, it->first);
         --next_label_id;
-        num_labels++;
+        ++num_labels;
 
-        label_size_counts[ops_slice.size()]++;
+        ++label_size_counts[ops_slice.size()];
     } else {
         this->ops_pool.pop_back();
 
-        reused_label_size_counts[it->first.size()]++;
+        ++reused_label_size_counts[it->first.size()];
     }
     return it->second;
 }
@@ -154,7 +154,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         // Collect transitions per op_id
         for (size_t target = 0; target < graph.size(); ++target) {
             for (const Successor &succ : graph[target]) {
-                num_transitions_before_lr++;
+                ++num_transitions_before_lr;
                 op_to_transitions[succ.op].emplace_back(succ.state, (int)target);
             }
         }
@@ -169,7 +169,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
             if (ops.size() == 1) {
                 int op = ops[0];
                 for (const auto &[src, target] : transitions) {
-                    num_non_label_transitions++;
+                    ++num_non_label_transitions;
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
@@ -177,7 +177,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
                 int label_id = create_or_reuse_label(move(ops));
 
                 for (const auto &[src, target] : transitions) {
-                    num_label_transitions++;
+                    ++num_label_transitions;
                     new_graph[target].emplace_back(label_id, src);
                 }
             }
@@ -187,7 +187,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         auto transition_groups = phmap::flat_hash_map<pair<int, int>, vector<int>, SzudzikPairHash>{};
         for (size_t target = 0; target < graph.size(); ++target) {
             for (const Successor &succ : graph[target]) {
-                num_transitions_before_lr++;
+                ++num_transitions_before_lr;
                 transition_groups[{succ.state, target}].push_back(succ.op);
             }
         }
@@ -199,12 +199,12 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
             // sort(ops.begin(), ops.end()); //check if sorted already
             if (static_cast<int>(ops.size()) < min_ops_per_label) {
                 for (int op : ops) {
-                    num_non_label_transitions++;
+                    ++num_non_label_transitions;
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
                 int label_id = create_or_reuse_label(move(ops));
-                num_label_transitions++;
+                ++num_label_transitions;
                 new_graph[target].emplace_back(label_id, src);
             }
         }
