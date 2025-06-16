@@ -215,7 +215,7 @@ Abstractions CartesianAbstractionGenerator::generate_abstractions(
         log << "\"" << size << "\": " << count;
         first = false;
     }
-    log << "}" << std::endl;
+    log << "}" << endl;
     
     log << "Total number of reused label transitions in Abstractions: " << num_total_reused_label_transitions << endl;
     log << "Total reused label size counts: {";
@@ -225,7 +225,7 @@ Abstractions CartesianAbstractionGenerator::generate_abstractions(
         log << "\"" << size << "\": " << count;
         first = false;
     }
-    log << "}" << std::endl;
+    log << "}" << endl;
     return abstractions;
 }
 

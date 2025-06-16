@@ -144,7 +144,7 @@ Abstractions ProjectionGenerator::generate_abstractions(
         log << "\"" << size << "\": " << count;
         first = false;
     }
-    log << "}" << std::endl;
+    log << "}" << endl;
     
     log << "Total number of reused label transitions in Abstractions: " << num_total_reused_label_transitions << endl;
     log << "Total reused label size counts: {";
@@ -154,7 +154,7 @@ Abstractions ProjectionGenerator::generate_abstractions(
         log << "\"" << size << "\": " << count;
         first = false;
     }
-    log << "}" << std::endl;
+    log << "}" << endl;
     log << "Time for building projections: " << pdbs_timer << endl;
     log << "Number of projections: " << abstractions.size() << endl;
     log << "Number of states in projections: " << collection_size << endl;

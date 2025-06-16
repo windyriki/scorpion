@@ -65,7 +65,7 @@ struct ProjectedEffect {
 ExplicitProjectionFactory::ExplicitProjectionFactory(
     const TaskProxy &task_proxy,
     const pdbs::Pattern &pattern,
-    const int min_ops_per_label)
+    int min_ops_per_label)
     : task_proxy(task_proxy),
       pattern(pattern),
       looping_operators(task_proxy.get_operators().size(), false),

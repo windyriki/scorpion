@@ -160,9 +160,8 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         }
 
         // Group by unique list of transitions
-        for (const auto &[op, transitions] : op_to_transitions) {
-            assert(is_sorted(transitions.begin(), transitions.end()));
-            // sort(transitions.begin(), transitions.end());
+        for (auto &[op, transitions] : op_to_transitions) {
+            sort(transitions.begin(), transitions.end());
             equivalence_groups[transitions].push_back(op);
         }
 
@@ -174,8 +173,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
-                assert(is_sorted(ops.begin(), ops.end()));
-                // sort(ops.begin(), ops.end());
+                sort(ops.begin(), ops.end());
                 int label_id = create_or_reuse_label(move(ops));
 
                 for (const auto &[src, target] : transitions) {

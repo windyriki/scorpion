@@ -57,7 +57,7 @@ public:
     ExplicitProjectionFactory(
         const TaskProxy &task_proxy,
         const pdbs::Pattern &pattern,
-        const int min_ops_per_label);
+        int min_ops_per_label);
 
     std::unique_ptr<Abstraction> convert_to_abstraction();
 };
