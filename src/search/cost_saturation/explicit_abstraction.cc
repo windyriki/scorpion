@@ -123,6 +123,7 @@ ExplicitAbstraction::ExplicitAbstraction(
 }
 
 int ExplicitAbstraction::create_or_reuse_label(vector<int> &&ops_sorted) {
+    assert(is_sorted_unique(ops_sorted));
     this->ops_pool.push_back(move(ops_sorted));
     const auto &ops_slice = this->ops_pool.back();
     const auto [it, inserted] = this->ops_to_label_id.emplace(ops_slice, next_label_id);
@@ -195,7 +196,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         for (auto &[src_target, ops] : transition_groups) {
             const auto &[src, target] = src_target;
             
-            assert(is_sorted(ops.begin(), ops.end()));
+            assert(is_sorted_unique(ops));
             // sort(ops.begin(), ops.end()); //check if sorted already
             if (static_cast<int>(ops.size()) < min_ops_per_label) {
                 for (int op : ops) {
