@@ -19,12 +19,13 @@ static void dijkstra_search(
     vector<int> &distances,
     const LabelIdToOps &label_id_to_ops) {
     assert(all_of(costs.begin(), costs.end(), [](int c) {return c >= 0;}));
-    vector<int> label_to_cost(label_id_to_ops.size() + 1, INF);
-    for (const auto &[id, ops]: label_id_to_ops) {
+    vector<int> label_to_cost(label_id_to_ops.size(), INF);
+    for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
+        const auto &ops = label_id_to_ops[idx];
         for (int op_id : ops) {
             assert(in_bounds(op_id, costs));
-            assert(in_bounds(-id, label_to_cost));
-            label_to_cost[-id]= min(label_to_cost[-id], costs[op_id]);
+            assert(in_bounds(idx, label_to_cost));
+            label_to_cost[idx]= min(label_to_cost[idx], costs[op_id]);
         }
     }
 
@@ -45,8 +46,8 @@ static void dijkstra_search(
                 assert(in_bounds(op, costs));
                 op_cost = costs[op];
             } else {
-                assert(in_bounds(-op, label_to_cost));
-                op_cost = label_to_cost[-op];
+                assert(in_bounds(-(op+1), label_to_cost));
+                op_cost = label_to_cost[-(op+1)];
             }
             assert(op_cost >= 0);
             int successor_distance = (op_cost == INF) ? INF : state_distance + op_cost;
@@ -75,10 +76,11 @@ static vector<bool> get_active_operators_from_graph(
                 assert(in_bounds(op_id,active_operators));
                 active_operators[op_id] = true;
             } else {
-                auto it = label_id_to_ops.find(op_id);
-                assert(it != label_id_to_ops.end());
-                for (int actual_op : it->second) {
-                    assert(in_bounds(actual_op,active_operators));
+                int label_idx = -(op_id + 1);
+                assert(in_bounds(label_idx, label_id_to_ops));
+                const auto &ops = label_id_to_ops[label_idx];
+                for (int actual_op : ops) {
+                    assert(in_bounds(actual_op, active_operators));
                     active_operators[actual_op] = true;
                 }
             }
@@ -128,10 +130,10 @@ int ExplicitAbstraction::create_or_reuse_label(vector<int> &&ops) {
     const auto &ops_slice = this->ops_pool.back();
     const auto [it, inserted] = this->ops_to_label_id.emplace(ops_slice, next_label_id);
     if (inserted) {
-        this->label_id_to_ops.emplace(it->second, it->first);
+        this->label_id_to_ops.emplace_back(it->first);
         --next_label_id;
-        ++num_labels;
 
+        ++num_labels;
         ++label_size_counts[ops_slice.size()];
     } else {
         this->ops_pool.pop_back();
@@ -217,15 +219,16 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     }
 
 #ifndef NDEBUG
-    for (const auto &[label_id, ops] : label_id_to_ops) {
-        g_log << "Label ID " << label_id << ": [";
+    for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
+        const auto &ops = label_id_to_ops[idx];
+        g_log << "Label ID " << -(idx + 1) << ": [";
         for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
                 g_log << ops[i];
                 if (i < static_cast<int>(ops.size()) - 1)
                 g_log << ", ";
-            }
-            g_log << "]" << endl;
         }
+        g_log << "]" << endl;
+    }
     g_log << "Number of transitions (before label reduction): " << num_transitions_before_lr << endl;
     g_log << "Number of transitions (after label reduction): " << num_non_label_transitions + num_label_transitions<< endl;
     g_log << "Change in transitions ((#non-label transitions+#label transitions)/#transitions): " << 
@@ -271,7 +274,7 @@ vector<int> ExplicitAbstraction::compute_saturated_costs(
     const vector<int> &h_values) const {
     int num_operators = get_num_operators();
     vector<int> saturated_costs(num_operators, -INF);
-    vector<int> saturated_label_costs(this->label_id_to_ops.size() + 1, -INF);
+    vector<int> saturated_label_costs(this->label_id_to_ops.size(), -INF);
 
     /* To prevent negative cost cycles we ensure that all operators
        inducing self-loops have non-negative costs. */
@@ -302,14 +305,14 @@ vector<int> ExplicitAbstraction::compute_saturated_costs(
             if (op_id >= 0) {
                 saturated_costs[op_id] = max(saturated_costs[op_id], needed);
             } else {
-                int label_idx = -op_id;
+                int label_idx = -(op_id + 1);
                 saturated_label_costs[label_idx] = max(saturated_label_costs[label_idx], needed);
             }
         }
     }
 
-    for (const auto &[label_id, ops] : label_id_to_ops) {
-        int idx = -label_id;
+    for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
+        const auto &ops = label_id_to_ops[idx];
         int label_cost = saturated_label_costs[idx];
         for (int op_id : ops) {
             saturated_costs[op_id] = max(saturated_costs[op_id], label_cost);
@@ -343,9 +346,10 @@ void ExplicitAbstraction::for_each_transition(const TransitionCallback &callback
             if (op_id >= 0) {
                 callback(Transition(src, op_id, target));
             } else {
-                auto it = this->label_id_to_ops.find(op_id);
-                assert(it != this->label_id_to_ops.end());
-                for (int actual_op : it->second) {
+                int label_idx = -(op_id + 1);
+                assert(in_bounds(label_idx, label_id_to_ops));
+                const auto &ops = label_id_to_ops[label_idx];
+                for (int actual_op : ops) {
                     callback(Transition(src, actual_op, target));
                 }
             }

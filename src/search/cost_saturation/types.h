@@ -55,7 +55,7 @@ struct OpsSliceEqualTo {
 };
 
 using OpsToLabelId = phmap::flat_hash_map<OpsSlice, int, OpsSliceHash, OpsSliceEqualTo>;
-using LabelIdToOps = phmap::flat_hash_map<int, OpsSlice>;
+using LabelIdToOps = std::vector<OpsSlice>;
 }
 
 #endif
