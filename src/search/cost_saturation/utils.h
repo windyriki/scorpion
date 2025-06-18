@@ -59,15 +59,6 @@ std::vector<int> get_abstract_state_ids(
         abstract_state_ids.begin(), get_abs_state_id);
     return abstract_state_ids;
 }
-struct VectorHash { //currently not used, but might be useful in the future
-    std::size_t operator()(const std::vector<int> &v) const {
-        std::size_t seed = v.size();
-        for (int i : v) {
-            seed ^= std::hash<int>{}(i) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        }
-        return seed;
-    }
-};
 
 struct PairVectorHash {
     std::size_t operator()(const std::vector<std::pair<int, int>> &v) const {
