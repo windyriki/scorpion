@@ -19,3 +19,4 @@ vgcore*
 out*
 compile_commands.json
 /experiments/cg-vs-ff/*
+docs
