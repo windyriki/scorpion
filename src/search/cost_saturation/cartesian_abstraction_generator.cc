@@ -135,32 +135,32 @@ void CartesianAbstractionGenerator::build_abstractions_for_subtasks(
             }
             abstraction = make_unique<ExplicitAbstraction>(
                 make_unique<CartesianAbstractionFunction>(
-                cartesian_abstraction->extract_refinement_hierarchy()),
-            move(backward_graph),
-            cartesian_abstraction->get_looping_operators(),
-            vector<int>(
-                cartesian_abstraction->get_goals().begin(),
-                cartesian_abstraction->get_goals().end()),
+                    cartesian_abstraction->extract_refinement_hierarchy()),
+                move(backward_graph),
+                cartesian_abstraction->get_looping_operators(),
+                vector<int>(
+                    cartesian_abstraction->get_goals().begin(),
+                    cartesian_abstraction->get_goals().end()),
                 min_ops_per_label);
-            
-            for (const auto &[label_size,counts] : abstraction->get_label_size_counts()) {
+
+            for (const auto &[label_size, counts] : abstraction->get_label_size_counts()) {
                 total_label_size_counts[label_size] += counts;
             }
-            for (const auto &[label_size,counts] : abstraction->get_reused_label_size_counts()) {
+            for (const auto &[label_size, counts] : abstraction->get_reused_label_size_counts()) {
                 total_reused_label_size_counts[label_size] += counts;
             }
             num_total_non_label_transitions += abstraction->get_num_non_label_transitions();
             num_total_label_transitions += abstraction->get_num_label_transitions();
-            num_total_reused_label_transitions += 
-            abstraction->get_num_label_transitions() - abstraction->get_num_labels();
+            num_total_reused_label_transitions +=
+                abstraction->get_num_label_transitions() - abstraction->get_num_labels();
             num_total_labels += abstraction->get_num_labels();
         } else {
-			abstraction = make_unique<CartesianAbstraction>(move(cartesian_abstraction));
+            abstraction = make_unique<CartesianAbstraction>(move(cartesian_abstraction));
         }
         abstractions.push_back(move(abstraction));
-		
+
         if (has_reached_resource_limit(timer) || unsolvable) {
-			break;
+            break;
         }
         --remaining_subtasks;
     }
@@ -172,11 +172,11 @@ Abstractions CartesianAbstractionGenerator::generate_abstractions(
     utils::CountdownTimer timer(max_time);
     num_states = 0;
     num_transitions = 0;
-	num_total_non_label_transitions = 0;
+    num_total_non_label_transitions = 0;
     num_total_label_transitions = 0;
     num_total_labels = 0;
     total_label_size_counts.clear();
-	num_total_reused_label_transitions = 0;
+    num_total_reused_label_transitions = 0;
     total_reused_label_size_counts.clear();
 
     log << "Build Cartesian abstractions" << endl << endl;
@@ -203,25 +203,27 @@ Abstractions CartesianAbstractionGenerator::generate_abstractions(
     log << "Total number of Cartesian states: " << num_states << endl;
     log << "Total number of transitions in Abstractions (before label reduction): " << num_transitions << endl;
     log << "Total number of transitions in Abstractions (after label reduction): " << num_total_non_label_transitions + num_total_label_transitions << endl;
-    log << "Total change in transitions ((#non-label transitions+#label transitions)/#transitions): " << 
-	static_cast<double>(num_total_non_label_transitions+num_total_label_transitions)/num_transitions << endl;
+    log << "Total change in transitions ((#non-label transitions+#label transitions)/#transitions): " <<
+        static_cast<double>(num_total_non_label_transitions + num_total_label_transitions) / num_transitions << endl;
     log << "Total number of non-label transitions in Abstractions: " << num_total_non_label_transitions << endl;
     log << "Total number of label transitions in Abstractions: " << num_total_label_transitions << endl;
     log << "Total number of labels in Abstractions: " << num_total_labels << endl;
     log << "Total label size counts: {";
     bool first = true;
-    for (const auto& [size, count] : total_label_size_counts) {
-        if (!first) log << ", ";
+    for (const auto & [size, count] : total_label_size_counts) {
+        if (!first)
+            log << ", ";
         log << "\"" << size << "\": " << count;
         first = false;
     }
     log << "}" << endl;
-    
+
     log << "Total number of reused label transitions in Abstractions: " << num_total_reused_label_transitions << endl;
     log << "Total reused label size counts: {";
     first = true;
-    for (const auto& [size, count] : total_reused_label_size_counts) {
-        if (!first) log << ", ";
+    for (const auto & [size, count] : total_reused_label_size_counts) {
+        if (!first)
+            log << ", ";
         log << "\"" << size << "\": " << count;
         first = false;
     }
@@ -236,10 +238,10 @@ public:
         document_title("Cartesian abstraction generator");
         cartesian_abstractions::add_common_cegar_options(*this);
         add_option<int>(
-        "min_ops_per_label",
-        "minimum number of operators a label must have",
-        "infinity",
-        plugins::Bounds("0", "infinity"));
+            "min_ops_per_label",
+            "minimum number of operators a label must have",
+            "infinity",
+            plugins::Bounds("0", "infinity"));
         utils::add_log_options_to_feature(*this);
     }
 

@@ -113,7 +113,7 @@ public:
             move(distances));
     }
 
-    vector<vector<OperatorID>> &&extract_wildcard_plan() {
+    vector<vector<OperatorID>> && extract_wildcard_plan() {
         return move(wildcard_plan);
     }
 };

@@ -51,8 +51,8 @@ std::vector<int> get_abstract_state_ids(
     std::vector<int> abstract_state_ids(abstractions.size(), -2);
     // Only add local state IDs for useful abstractions and use dummy value if abstraction will never be used.
     auto get_abs_state_id = [&state](const AbstractionsOrFunction &abstraction) {
-            return abstraction ? abstraction->get_abstract_state_id(state) : -1;
-        };
+        return abstraction ? abstraction->get_abstract_state_id(state) : -1;
+    };
     std::transform(
         std::execution::unseq,
         abstractions.cbegin(), abstractions.cend(),

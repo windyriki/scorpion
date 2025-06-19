@@ -170,7 +170,7 @@ CostPartitioningHeuristicCollectionGenerator::generate_cost_partitionings(
     log << "Evaluated orders: " << evaluated_orders << endl;
     log << "Cost partitionings: " << cp_heuristics.size() << endl;
     log << "Time for computing cost partitionings: " << timer.get_elapsed_time()
-    << endl;
+        << endl;
     log << "Estimated heuristic size: " << size_kb << " KiB" << endl;
     return cp_heuristics;
 }

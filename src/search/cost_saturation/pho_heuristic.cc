@@ -162,8 +162,8 @@ public:
                                         const vector<int> &order_,
                                         const vector<int> &costs_,
                                         const vector<int> &abstract_state_ids) {
-                return pho.compute_cost_partitioning(abstractions_, order_, costs_, abstract_state_ids);
-            };
+            return pho.compute_cost_partitioning(abstractions_, order_, costs_, abstract_state_ids);
+        };
         vector<CostPartitioningHeuristic> cp_heuristics =
             get_cp_heuristic_collection_generator_from_options(options)->generate_cost_partitionings(
                 task_proxy, abstractions, costs, cp_function);

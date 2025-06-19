@@ -42,12 +42,13 @@ struct UnaryOperator {
     int unsatisfied_preconditions;
     bool excluded;
     UnaryOperator(const std::vector<Proposition *> &preconditions,
-                  Proposition *eff, int op_or_axiom_id)
+                  Proposition * eff, int op_or_axiom_id)
         : op_or_axiom_id(op_or_axiom_id),
           num_preconditions(static_cast<int>(preconditions.size())),
           effect(eff),
           unsatisfied_preconditions(num_preconditions),
-          excluded(false) {}
+          excluded(false) {
+    }
 };
 
 class Exploration {

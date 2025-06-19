@@ -66,9 +66,9 @@ public:
         const std::vector<int> &h_values) const = 0;
 
     virtual int get_num_operators() const = 0;
-    virtual int get_num_non_label_transitions() const { return 0;}
-    virtual int get_num_label_transitions() const { return 0; }
-    virtual int get_num_labels() const { return 0; }
+    virtual int get_num_non_label_transitions() const {return 0;}
+    virtual int get_num_label_transitions() const {return 0;}
+    virtual int get_num_labels() const {return 0;}
     virtual phmap::flat_hash_map<int, int> get_label_size_counts() const {
         return phmap::flat_hash_map<int, int>();
     }

@@ -11,8 +11,8 @@ struct InvertedOperator {
     std::vector<FactPair> effects;
 
     InvertedOperator(
-        std::vector<FactPair> &&preconditions,
-        std::vector<FactPair> &&effects)
+        std::vector<FactPair> && preconditions,
+        std::vector<FactPair> && effects)
         : preconditions(move(preconditions)),
           effects(move(effects)) {
     }

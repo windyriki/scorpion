@@ -34,7 +34,7 @@ public:
         return *(first + index);
     }
 
-    size_t size() const { return last-first; }
+    size_t size() const {return last - first;}
 private:
     friend class ArrayPool<Value>;
 

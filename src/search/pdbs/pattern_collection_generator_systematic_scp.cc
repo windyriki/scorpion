@@ -624,10 +624,10 @@ public:
             "in the partial ordering of the causal graph)",
             "cg_down");
         add_option<int>(
-        "min_ops_per_label",
-        "minimum number of operators a label must have",
-        "infinity",
-        plugins::Bounds("1", "infinity"));
+            "min_ops_per_label",
+            "minimum number of operators a label must have",
+            "infinity",
+            plugins::Bounds("1", "infinity"));
         utils::add_rng_options_to_feature(*this);
         add_generator_options_to_feature(*this);
     }

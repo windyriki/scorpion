@@ -27,7 +27,7 @@ struct MergeTreeNode {
     // Copy constructor. Does not set parent pointers.
     MergeTreeNode(const MergeTreeNode &other);
     MergeTreeNode(int ts_index);
-    MergeTreeNode(MergeTreeNode *left_child, MergeTreeNode *right_child);
+    MergeTreeNode(MergeTreeNode * left_child, MergeTreeNode * right_child);
     ~MergeTreeNode();
 
     MergeTreeNode *get_left_most_sibling();

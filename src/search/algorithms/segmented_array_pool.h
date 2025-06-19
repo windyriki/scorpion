@@ -35,7 +35,7 @@ public:
         return *(first + index);
     }
 
-    size_t size() const { return last-first; }
+    size_t size() const {return last - first;}
 private:
     friend class ArrayPool<Value>;
 
@@ -83,7 +83,7 @@ class ArrayPool {
 public:
     ArrayPool() : m_data(1, std::vector<int>(1024)), m_cur_segment(0), m_cur_pos(0), m_prev_pos(0), m_size(0) {  }
 
-    void push_back(const std::vector<Value>& vec) {
+    void push_back(const std::vector<Value> &vec) {
         resize_to_fit(vec.size());
         m_prev_pos = m_cur_pos;
         std::copy(vec.begin(), vec.end(), m_data[m_cur_segment].begin() + m_cur_pos);
@@ -94,7 +94,7 @@ public:
     ArrayPoolSlice<Value> back() const {
         assert(size() > 0);
         return ArrayPoolSlice<Value>(
-            m_data[m_cur_segment].begin() + m_prev_pos, 
+            m_data[m_cur_segment].begin() + m_prev_pos,
             m_data[m_cur_segment].begin() + m_cur_pos);
     }
 

@@ -42,7 +42,7 @@ Abstractions ProjectionGenerator::generate_abstractions(
     utils::Timer patterns_timer;
     TaskProxy task_proxy(*task);
     num_total_non_label_transitions = 0;
-	num_total_reused_label_transitions = 0;
+    num_total_reused_label_transitions = 0;
     num_total_label_transitions = 0;
 
     task_properties::verify_no_axioms(task_proxy);
@@ -99,17 +99,17 @@ Abstractions ProjectionGenerator::generate_abstractions(
             projection = ExplicitProjectionFactory(
                 task_proxy, pattern, min_ops_per_label).convert_to_abstraction();
 
-            for (const auto &[label_size,counts] : projection->get_label_size_counts()) {
+            for (const auto &[label_size, counts] : projection->get_label_size_counts()) {
                 total_label_size_counts[label_size] += counts;
             }
-            for (const auto &[label_size,counts] : projection->get_reused_label_size_counts()) {
+            for (const auto &[label_size, counts] : projection->get_reused_label_size_counts()) {
                 total_reused_label_size_counts[label_size] += counts;
             }
             num_total_non_label_transitions += projection->get_num_non_label_transitions();
             num_total_label_transitions += projection->get_num_label_transitions();
-            num_total_reused_label_transitions += 
-            projection->get_num_label_transitions() - projection->get_num_labels();
-            num_total_labels += projection->get_num_labels();        
+            num_total_reused_label_transitions +=
+                projection->get_num_label_transitions() - projection->get_num_labels();
+            num_total_labels += projection->get_num_labels();
         } else {
             task_properties::verify_no_conditional_effects(task_proxy);
             projection = make_unique<Projection>(
@@ -128,29 +128,31 @@ Abstractions ProjectionGenerator::generate_abstractions(
     for (auto &abstraction : abstractions) {
         collection_size += abstraction->get_num_states();
         abstraction->for_each_transition(
-            [this] (const Transition &) { ++num_transitions; });
+            [this] (const Transition &) {++num_transitions;});
     }
     log << "Total Number of transitions in Abstractions (before label reduction): " << num_transitions << endl;
     log << "Total number of transitions in Abstractions (after label reduction): " << num_total_non_label_transitions + num_total_label_transitions << endl;
-    log << "Total change in transitions ((#non-label transitions+#label transitions)/#transitions): " << 
-	static_cast<double>(num_total_non_label_transitions+num_total_label_transitions)/num_transitions << endl;
+    log << "Total change in transitions ((#non-label transitions+#label transitions)/#transitions): " <<
+        static_cast<double>(num_total_non_label_transitions + num_total_label_transitions) / num_transitions << endl;
     log << "Total number of non-label transitions in Abstractions: " << num_total_non_label_transitions << endl;
     log << "Total number of label transitions in Abstractions: " << num_total_label_transitions << endl;
     log << "Total number of labels in Abstractions: " << num_total_labels << endl;
     log << "Total label size counts: {";
     bool first = true;
-    for (const auto& [size, count] : total_label_size_counts) {
-        if (!first) log << ", ";
+    for (const auto & [size, count] : total_label_size_counts) {
+        if (!first)
+            log << ", ";
         log << "\"" << size << "\": " << count;
         first = false;
     }
     log << "}" << endl;
-    
+
     log << "Total number of reused label transitions in Abstractions: " << num_total_reused_label_transitions << endl;
     log << "Total reused label size counts: {";
     first = true;
-    for (const auto& [size, count] : total_reused_label_size_counts) {
-        if (!first) log << ", ";
+    for (const auto & [size, count] : total_reused_label_size_counts) {
+        if (!first)
+            log << ", ";
         log << "\"" << size << "\": " << count;
         first = false;
     }

@@ -22,7 +22,7 @@ struct FlawedState {
     Cost h;
     std::vector<StateID> concrete_states;
 
-    FlawedState(int abs_id, Cost h, std::vector<StateID> &&concrete_states)
+    FlawedState(int abs_id, Cost h, std::vector<StateID> && concrete_states)
         : abs_id(abs_id),
           h(h),
           concrete_states(move(concrete_states)) {

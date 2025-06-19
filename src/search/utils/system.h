@@ -22,13 +22,13 @@
 #include <stdlib.h>
 
 #define ABORT(msg) \
-    ( \
-        (std::cerr << "Critical error in file " << __FILE__ \
-                   << ", line " << __LINE__ << ": " << std::endl \
-                   << (msg) << std::endl), \
-        (abort()), \
-        (void)0 \
-    )
+        ( \
+            (std::cerr << "Critical error in file " << __FILE__ \
+                       << ", line " << __LINE__ << ": " << std::endl \
+                       << (msg) << std::endl), \
+            (abort()), \
+            (void)0 \
+        )
 
 namespace utils {
 enum class ExitCode {

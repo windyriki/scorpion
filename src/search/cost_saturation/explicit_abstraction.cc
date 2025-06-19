@@ -25,7 +25,7 @@ static void dijkstra_search(
         for (int op_id : ops) {
             assert(in_bounds(op_id, costs));
             assert(in_bounds(idx, label_to_cost));
-            label_to_cost[idx]= min(label_to_cost[idx], costs[op_id]);
+            label_to_cost[idx] = min(label_to_cost[idx], costs[op_id]);
         }
     }
 
@@ -46,8 +46,8 @@ static void dijkstra_search(
                 assert(in_bounds(op, costs));
                 op_cost = costs[op];
             } else {
-                assert(in_bounds(-(op+1), label_to_cost));
-                op_cost = label_to_cost[-(op+1)];
+                assert(in_bounds(-(op + 1), label_to_cost));
+                op_cost = label_to_cost[-(op + 1)];
             }
             assert(op_cost >= 0);
             int successor_distance = (op_cost == INF) ? INF : state_distance + op_cost;
@@ -73,7 +73,7 @@ static vector<bool> get_active_operators_from_graph(
         for (const Successor &transition : backward_graph[target]) {
             int op_id = transition.op;
             if (op_id >= 0) {
-                assert(in_bounds(op_id,active_operators));
+                assert(in_bounds(op_id, active_operators));
                 active_operators[op_id] = true;
             } else {
                 int label_idx = -(op_id + 1);
@@ -110,7 +110,6 @@ ExplicitAbstraction::ExplicitAbstraction(
                            backward_graph, looping_operators.size(), label_id_to_ops)),
       looping_operators(move(looping_operators)),
       goal_states(move(goal_states)) {
-
 #ifndef NDEBUG
     for (int target = 0; target < get_num_states(); ++target) {
         // Check that no transition is stored multiple times.
@@ -119,7 +118,7 @@ ExplicitAbstraction::ExplicitAbstraction(
         assert(is_sorted_unique(copied_transitions));
         // Check that we don't store self-loops.
         assert(all_of(copied_transitions.begin(), copied_transitions.end(),
-                      [target](const Successor &succ) { return succ.state != target; }));
+                      [target](const Successor &succ) {return succ.state != target;}));
     }
 #endif
 }
@@ -148,7 +147,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     int num_transitions_before_lr = 0;
     // Retrieve non-looping transitions.
     vector<vector<Successor>> new_graph(graph.size());
-    
+
     if (min_ops_per_label == 0) {
         // Equivalence-based grouping: group by (op_id -> list of (src,target))
         phmap::flat_hash_map<vector<pair<int, int>>, vector<int>, PairVectorHash> equivalence_groups;
@@ -196,7 +195,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
 
         for (auto &[src_target, ops] : transition_groups) {
             const auto &[src, target] = src_target;
-            
+
             if (static_cast<int>(ops.size()) < min_ops_per_label) {
                 for (int op : ops) {
                     ++num_non_label_transitions;
@@ -213,8 +212,8 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     for (int target = 0; target < static_cast<int>(graph.size()); ++target) {
         new_graph[target].shrink_to_fit();
 #ifndef NDEBUG
-		g_log << "Old Graph: " << target << graph[target] << endl;
-		g_log << "New Graph: " << target << new_graph[target] << endl;
+        g_log << "Old Graph: " << target << graph[target] << endl;
+        g_log << "New Graph: " << target << new_graph[target] << endl;
 #endif
     }
 
@@ -223,23 +222,24 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         const auto &ops = label_id_to_ops[idx];
         g_log << "Label ID " << -(idx + 1) << ": [";
         for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
-                g_log << ops[i];
-                if (i < static_cast<int>(ops.size()) - 1)
+            g_log << ops[i];
+            if (i < static_cast<int>(ops.size()) - 1)
                 g_log << ", ";
         }
         g_log << "]" << endl;
     }
     g_log << "Number of transitions (before label reduction): " << num_transitions_before_lr << endl;
-    g_log << "Number of transitions (after label reduction): " << num_non_label_transitions + num_label_transitions<< endl;
-    g_log << "Change in transitions ((#non-label transitions+#label transitions)/#transitions): " << 
-    static_cast<double>(num_non_label_transitions+num_label_transitions)/num_transitions_before_lr << endl;
+    g_log << "Number of transitions (after label reduction): " << num_non_label_transitions + num_label_transitions << endl;
+    g_log << "Change in transitions ((#non-label transitions+#label transitions)/#transitions): " <<
+        static_cast<double>(num_non_label_transitions + num_label_transitions) / num_transitions_before_lr << endl;
     g_log << "Number of non-label transitions: " << num_non_label_transitions << endl;
-    g_log << "Number of label transitions: " << num_label_transitions<< endl;
+    g_log << "Number of label transitions: " << num_label_transitions << endl;
     g_log << "Number of labels: " << num_labels << endl;
     g_log << "Label size counts: {";
     bool first = true;
-    for (const auto& [size, count] : label_size_counts) {
-        if (!first) g_log << ", ";
+    for (const auto & [size, count] : label_size_counts) {
+        if (!first)
+            g_log << ", ";
         g_log << "\"" << size << "\": " << count;
         first = false;
     }
@@ -248,8 +248,9 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     g_log << "Number of reused labels: " << num_label_transitions - num_labels << endl;
     g_log << "Reused label size counts: {";
     first = true;
-    for (const auto& [size, count] : reused_label_size_counts) {
-        if (!first) g_log << ", ";
+    for (const auto & [size, count] : reused_label_size_counts) {
+        if (!first)
+            g_log << ", ";
         g_log << "\"" << size << "\": " << count;
         first = false;
     }

@@ -249,10 +249,10 @@ void MergeAndShrinkAlgorithm::main_loop(
     merge_strategy_factory = nullptr;
 
     auto log_main_loop_progress = [&timer, this](const string &msg) {
-            log << "M&S algorithm main loop timer: "
-                << timer.get_elapsed_time()
-                << " (" << msg << ")" << endl;
-        };
+        log << "M&S algorithm main loop timer: "
+            << timer.get_elapsed_time()
+            << " (" << msg << ")" << endl;
+    };
     while (fts.get_num_active_entries() > 1) {
         // Choose next transition systems to merge
         pair<int, int> merge_indices = merge_strategy->get_next();
