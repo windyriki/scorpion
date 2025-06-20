@@ -9,7 +9,6 @@
 #include <memory>
 
 using namespace std;
-using namespace utils;
 
 namespace cost_saturation {
 
@@ -22,15 +21,15 @@ static void dijkstra_search(
     const vector<vector<Successor>> &graph,
     const vector<int> &costs,
     priority_queues::AdaptiveQueue<int> &queue,
-    vector<int> &distances,
-    const LabelIdToOps &label_id_to_ops) {
+    const LabelIdToOps &label_id_to_ops,
+    vector<int> &distances) {
     assert(all_of(costs.begin(), costs.end(), [](int c) {return c >= 0;}));
     vector<int> label_to_cost(label_id_to_ops.size(), INF);
     for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
         const auto &ops = label_id_to_ops[idx];
         for (int op_id : ops) {
-            assert(in_bounds(op_id, costs));
-            assert(in_bounds(idx, label_to_cost));
+            assert(utils::in_bounds(op_id, costs));
+            assert(utils::in_bounds(idx, label_to_cost));
             label_to_cost[idx] = min(label_to_cost[idx], costs[op_id]);
         }
     }
@@ -49,11 +48,11 @@ static void dijkstra_search(
             int op = transition.op;
             int op_cost;
             if (op >= 0) {
-                assert(in_bounds(op, costs));
+                assert(utils::in_bounds(op, costs));
                 op_cost = costs[op];
             } else {
                 int label_idx = convert_op_to_label(op);
-                assert(in_bounds(label_idx, label_to_cost));
+                assert(utils::in_bounds(label_idx, label_to_cost));
                 op_cost = label_to_cost[label_idx];
             }
             assert(op_cost >= 0);
@@ -80,14 +79,14 @@ static vector<bool> get_active_operators_from_graph(
         for (const Successor &transition : backward_graph[target]) {
             int op_id = transition.op;
             if (op_id >= 0) {
-                assert(in_bounds(op_id, active_operators));
+                assert(utils::in_bounds(op_id, active_operators));
                 active_operators[op_id] = true;
             } else {
                 int label_idx = convert_op_to_label(op_id);
-                assert(in_bounds(label_idx, label_id_to_ops));
+                assert(utils::in_bounds(label_idx, label_id_to_ops));
                 const auto &ops = label_id_to_ops[label_idx];
                 for (int actual_op : ops) {
-                    assert(in_bounds(actual_op, active_operators));
+                    assert(utils::in_bounds(actual_op, active_operators));
                     active_operators[actual_op] = true;
                 }
             }
@@ -122,7 +121,7 @@ ExplicitAbstraction::ExplicitAbstraction(
         // Check that no transition is stored multiple times.
         vector<Successor> copied_transitions = this->backward_graph[target];
         sort(copied_transitions.begin(), copied_transitions.end());
-        assert(is_sorted_unique(copied_transitions));
+        assert(utils::is_sorted_unique(copied_transitions));
         // Check that we don't store self-loops.
         assert(all_of(copied_transitions.begin(), copied_transitions.end(),
                       [target](const Successor &succ) {return succ.state != target;}));
@@ -219,49 +218,49 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     for (int target = 0; target < static_cast<int>(graph.size()); ++target) {
         new_graph[target].shrink_to_fit();
 #ifndef NDEBUG
-        g_log << "Old Graph: " << target << graph[target] << endl;
-        g_log << "New Graph: " << target << new_graph[target] << endl;
+        utils::g_log << "Old Graph: " << target << graph[target] << endl;
+        utils::g_log << "New Graph: " << target << new_graph[target] << endl;
 #endif
     }
 
 #ifndef NDEBUG
     for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
         const auto &ops = label_id_to_ops[idx];
-        g_log << "Label ID " << convert_op_to_label(idx) << ": [";
+        utils::g_log << "Label ID " << -(idx - 1) << ": [";
         for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
-            g_log << ops[i];
+            utils::g_log << ops[i];
             if (i < static_cast<int>(ops.size()) - 1)
-                g_log << ", ";
+                utils::g_log << ", ";
         }
-        g_log << "]" << endl;
+        utils::g_log << "]" << endl;
     }
-    g_log << "Number of transitions (before label reduction): " << num_transitions_before_lr << endl;
-    g_log << "Number of transitions (after label reduction): " << num_non_label_transitions + num_label_transitions << endl;
-    g_log << "Change in transitions ((#non-label transitions+#label transitions)/#transitions): " <<
+    utils::g_log << "Number of transitions (before label reduction): " << num_transitions_before_lr << endl;
+    utils::g_log << "Number of transitions (after label reduction): " << num_non_label_transitions + num_label_transitions << endl;
+    utils::g_log << "Change in transitions ((#non-label transitions+#label transitions)/#transitions): " <<
         static_cast<double>(num_non_label_transitions + num_label_transitions) / num_transitions_before_lr << endl;
-    g_log << "Number of non-label transitions: " << num_non_label_transitions << endl;
-    g_log << "Number of label transitions: " << num_label_transitions << endl;
-    g_log << "Number of labels: " << num_labels << endl;
-    g_log << "Label size counts: {";
+    utils::g_log << "Number of non-label transitions: " << num_non_label_transitions << endl;
+    utils::g_log << "Number of label transitions: " << num_label_transitions << endl;
+    utils::g_log << "Number of labels: " << num_labels << endl;
+    utils::g_log << "Label size counts: {";
     bool first = true;
     for (const auto & [size, count] : label_size_counts) {
         if (!first)
-            g_log << ", ";
-        g_log << "\"" << size << "\": " << count;
+            utils::g_log << ", ";
+        utils::g_log << "\"" << size << "\": " << count;
         first = false;
     }
-    g_log << "}" << endl;
+    utils::g_log << "}" << endl;
 
-    g_log << "Number of reused labels: " << num_label_transitions - num_labels << endl;
-    g_log << "Reused label size counts: {";
+    utils::g_log << "Number of reused labels: " << num_label_transitions - num_labels << endl;
+    utils::g_log << "Reused label size counts: {";
     first = true;
     for (const auto & [size, count] : reused_label_size_counts) {
         if (!first)
-            g_log << ", ";
-        g_log << "\"" << size << "\": " << count;
+            utils::g_log << ", ";
+        utils::g_log << "\"" << size << "\": " << count;
         first = false;
     }
-    g_log << "}" << endl;
+    utils::g_log << "}" << endl;
 #endif
 
     return new_graph;
@@ -274,7 +273,7 @@ vector<int> ExplicitAbstraction::compute_goal_distances(const vector<int> &costs
         goal_distances[goal_state] = 0;
         queue.push(0, goal_state);
     }
-    dijkstra_search(backward_graph, costs, queue, goal_distances, label_id_to_ops);
+    dijkstra_search(backward_graph, costs, queue, label_id_to_ops, goal_distances);
     return goal_distances;
 }
 
@@ -282,7 +281,7 @@ vector<int> ExplicitAbstraction::compute_saturated_costs(
     const vector<int> &h_values) const {
     int num_operators = get_num_operators();
     vector<int> saturated_costs(num_operators, -INF);
-    vector<int> saturated_label_costs(this->label_id_to_ops.size(), -INF);
+    vector<int> saturated_label_costs(label_id_to_ops.size(), -INF);
 
     /* To prevent negative cost cycles we ensure that all operators
        inducing self-loops have non-negative costs. */
@@ -294,7 +293,7 @@ vector<int> ExplicitAbstraction::compute_saturated_costs(
 
     int num_states = backward_graph.size();
     for (int target = 0; target < num_states; ++target) {
-        assert(in_bounds(target, h_values));
+        assert(utils::in_bounds(target, h_values));
         int target_h = h_values[target];
         if (target_h == INF) {
             continue;
@@ -303,7 +302,7 @@ vector<int> ExplicitAbstraction::compute_saturated_costs(
         for (const Successor &transition : backward_graph[target]) {
             int op_id = transition.op;
             int src = transition.state;
-            assert(in_bounds(src, h_values));
+            assert(utils::in_bounds(src, h_values));
             int src_h = h_values[src];
             if (src_h == INF) {
                 continue;
@@ -355,7 +354,7 @@ void ExplicitAbstraction::for_each_transition(const TransitionCallback &callback
                 callback(Transition(src, op_id, target));
             } else {
                 int label_idx = convert_op_to_label(op_id);
-                assert(in_bounds(label_idx, label_id_to_ops));
+                assert(utils::in_bounds(label_idx, label_id_to_ops));
                 const auto &ops = label_id_to_ops[label_idx];
                 for (int actual_op : ops) {
                     callback(Transition(src, actual_op, target));
@@ -400,7 +399,7 @@ void ExplicitAbstraction::dump() const {
             int src = pair.first;
             const vector<int> &operators = pair.second;
             cout << "    " << src << " -> " << target
-                 << " [label = \"" << join(operators, "_") << "\"];" << endl;
+                 << " [label = \"" << utils::join(operators, "_") << "\"];" << endl;
         }
     }
     cout << "}" << endl;
