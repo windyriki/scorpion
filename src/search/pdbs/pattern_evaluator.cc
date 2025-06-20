@@ -165,7 +165,7 @@ PatternEvaluator::PatternEvaluator(
     sort(active_ops.begin(), active_ops.end(),
          [&costs](pair<int, int> f1, pair<int, int> f2) {
              return make_pair(costs[f1.first], f1.second)
-                    < make_pair(costs[f2.first], f2.second);
+             < make_pair(costs[f2.first], f2.second);
          });
 
     AbstractOperatorSet seen_abstract_ops;

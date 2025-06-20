@@ -27,7 +27,7 @@ class CostPartitioningHeuristic {
            function assigned to the associated abstraction. */
         std::vector<int> h_values;
 
-        LookupTable(int abstraction_id, std::vector<int> && h_values)
+        LookupTable(int abstraction_id, std::vector<int> &&h_values)
             : abstraction_id(abstraction_id),
               h_values(move(h_values)) {
         }

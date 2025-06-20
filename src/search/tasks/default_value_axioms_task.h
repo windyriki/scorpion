@@ -41,7 +41,7 @@ struct DefaultValueAxiom {
     FactPair head;
     std::vector<FactPair> condition;
 
-    DefaultValueAxiom(FactPair head, std::vector<FactPair> && condition)
+    DefaultValueAxiom(FactPair head, std::vector<FactPair> &&condition)
         : head(head), condition(condition) {
     }
 };

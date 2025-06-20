@@ -94,7 +94,7 @@ struct ValueTransition {
     ValueNode *target;
     std::vector<ValueTransitionLabel> labels;
 
-    ValueTransition(ValueNode * targ)
+    ValueTransition(ValueNode *targ)
         : target(targ) {
     }
 
@@ -112,7 +112,7 @@ struct ValueNode {
     ValueNode *reached_from;
     ValueTransitionLabel *reached_by;
 
-    ValueNode(DomainTransitionGraph * parent, int val)
+    ValueNode(DomainTransitionGraph *parent, int val)
         : parent_graph(parent), value(val), reached_from(nullptr),
           reached_by(nullptr) {
     }

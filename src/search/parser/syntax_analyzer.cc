@@ -147,8 +147,8 @@ static ASTNodePtr parse_function(TokenStream &tokens,
     {
         utils::TraceBlock block(context, "Parsing plugin arguments");
         auto callback = [&]() -> void {
-            parse_argument(tokens, positional_arguments, keyword_arguments, context);
-        };
+                parse_argument(tokens, positional_arguments, keyword_arguments, context);
+            };
         parse_sequence(tokens, context, TokenType::CLOSING_PARENTHESIS, callback);
     }
     tokens.pop(context, TokenType::CLOSING_PARENTHESIS);
@@ -183,8 +183,8 @@ static ASTNodePtr parse_list(TokenStream &tokens, SyntaxAnalyzerContext &context
     {
         utils::TraceBlock block(context, "Parsing list arguments");
         auto callback = [&]() -> void {
-            elements.push_back(parse_node(tokens, context));
-        };
+                elements.push_back(parse_node(tokens, context));
+            };
         parse_sequence(tokens, context, TokenType::CLOSING_BRACKET, callback);
     }
     tokens.pop(context, TokenType::CLOSING_BRACKET);
