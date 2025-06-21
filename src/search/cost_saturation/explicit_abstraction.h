@@ -61,16 +61,17 @@ public:
         std::vector<std::vector<Successor>> &&backward_graph,
         std::vector<bool> &&looping_operators,
         std::vector<int> &&goal_states,
-        int min_ops_per_label);
+        int min_ops_per_label,
+        int min_occurences_per_label);
 
-    virtual int create_or_reuse_label(OpsToLabelId ops_to_label_id, std::vector<int> &&ops_sorted);
+    virtual int create_or_reuse_label(OpsToLabelId &ops_to_label_id, std::vector<int> &&ops_sorted);
     virtual int get_num_non_label_transitions() const override {return num_non_label_transitions;}
     virtual int get_num_label_transitions() const override {return num_label_transitions;}
     virtual int get_num_labels() const override {return num_labels;}
     virtual phmap::flat_hash_map<int, int> get_label_size_counts() const override {return label_size_counts;}
     virtual phmap::flat_hash_map<int, int> get_reused_label_size_counts() const override {return reused_label_size_counts;}
     virtual std::vector<std::vector<Successor>> label_reduction(
-        std::vector<std::vector<Successor>> &graph, int min_ops_per_label);
+        std::vector<std::vector<Successor>> &graph, int min_ops_per_labelm, int min_occurences_per_label);
     virtual std::vector<int> compute_goal_distances(
         const std::vector<int> &costs) const override;
     virtual std::vector<int> compute_saturated_costs(

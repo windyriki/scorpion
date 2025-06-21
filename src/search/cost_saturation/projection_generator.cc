@@ -22,6 +22,7 @@ ProjectionGenerator::ProjectionGenerator(
     bool combine_labels,
     bool create_complete_transition_system,
     int min_ops_per_label,
+    int min_occurences_per_label,
     utils::Verbosity verbosity)
     : AbstractionGenerator(verbosity),
       pattern_generator(patterns),
@@ -29,6 +30,7 @@ ProjectionGenerator::ProjectionGenerator(
       combine_labels(combine_labels),
       create_complete_transition_system(create_complete_transition_system),
       min_ops_per_label(min_ops_per_label),
+      min_occurences_per_label(min_occurences_per_label),
       num_transitions(0),
       num_total_non_label_transitions(0),
       num_total_label_transitions(0),
@@ -97,7 +99,7 @@ Abstractions ProjectionGenerator::generate_abstractions(
             projection = move((*projections)[abstractions.size()]);
         } else if (create_complete_transition_system) {
             projection = ExplicitProjectionFactory(
-                task_proxy, pattern, min_ops_per_label).convert_to_abstraction();
+                task_proxy, pattern, min_ops_per_label, min_occurences_per_label).convert_to_abstraction();
 
             for (const auto &[label_size, counts] : projection->get_label_size_counts()) {
                 total_label_size_counts[label_size] += counts;
@@ -200,6 +202,11 @@ public:
             "minimum number of operators a label must have",
             "infinity",
             plugins::Bounds("0", "infinity"));
+        add_option<int>(
+            "min_occurences_per_label",
+            "minimum number of occurences a label must have",
+            "1",
+            plugins::Bounds("1", "infinity"));
         add_abstraction_generator_arguments_to_feature(*this);
     }
 
@@ -211,6 +218,7 @@ public:
             options.get<bool>("combine_labels"),
             options.get<bool>("create_complete_transition_system"),
             options.get<int>("min_ops_per_label"),
+            options.get<int>("min_occurences_per_label"),
             get_abstraction_generator_arguments_from_options(options));
     }
 };

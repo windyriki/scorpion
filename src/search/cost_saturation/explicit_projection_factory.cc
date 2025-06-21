@@ -65,11 +65,13 @@ struct ProjectedEffect {
 ExplicitProjectionFactory::ExplicitProjectionFactory(
     const TaskProxy &task_proxy,
     const pdbs::Pattern &pattern,
-    int min_ops_per_label)
+    int min_ops_per_label,
+    int min_occurences_per_label)
     : task_proxy(task_proxy),
       pattern(pattern),
       looping_operators(task_proxy.get_operators().size(), false),
-      min_ops_per_label(min_ops_per_label) {
+      min_ops_per_label(min_ops_per_label),
+      min_occurences_per_label(min_occurences_per_label) {
     assert(utils::is_sorted_unique(pattern));
 
     VariablesProxy variables = task_proxy.get_variables();
@@ -366,6 +368,7 @@ unique_ptr<Abstraction> ExplicitProjectionFactory::convert_to_abstraction() {
         move(backward_graph),
         move(looping_operators),
         move(goal_states),
-        min_ops_per_label);
+        min_ops_per_label,
+        min_occurences_per_label);
 }
 }

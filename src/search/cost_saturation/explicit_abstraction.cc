@@ -11,7 +11,6 @@
 using namespace std;
 
 namespace cost_saturation {
-
 static int convert_op_to_label(int op_id) {
     assert(op_id < 0);
     return -(op_id + 1);
@@ -100,7 +99,8 @@ ExplicitAbstraction::ExplicitAbstraction(
     vector<vector<Successor>> &&backward_graph_,
     vector<bool> &&looping_operators,
     vector<int> &&goal_states,
-    int min_ops_per_label)
+    int min_ops_per_label,
+    int min_occurences_per_label)
     : Abstraction(move(abstraction_function)),
       num_non_label_transitions(0),
       num_label_transitions(0),
@@ -110,7 +110,7 @@ ExplicitAbstraction::ExplicitAbstraction(
       ops_pool(),
       label_id_to_ops(),
       next_label_id(-1),
-      backward_graph(move(label_reduction(backward_graph_, min_ops_per_label))),
+      backward_graph(move(label_reduction(backward_graph_, min_ops_per_label, min_occurences_per_label))),
       active_operators(get_active_operators_from_graph(
                            backward_graph, looping_operators.size(), label_id_to_ops)),
       looping_operators(move(looping_operators)),
@@ -128,8 +128,8 @@ ExplicitAbstraction::ExplicitAbstraction(
 #endif
 }
 
-int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId ops_to_label_id, vector<int> &&ops) {
-    sort(ops.begin(), ops.end());
+int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId &ops_to_label_id, vector<int> &&ops) {
+    assert(utils::is_sorted_unique(ops));
     this->ops_pool.push_back(move(ops));
     const auto &ops_slice = this->ops_pool.back();
     const auto [it, inserted] = ops_to_label_id.emplace(ops_slice, next_label_id);
@@ -148,7 +148,7 @@ int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId ops_to_label_id, vec
 }
 
 vector<vector<Successor>> ExplicitAbstraction::label_reduction(
-    vector<vector<Successor>> &graph, int min_ops_per_label) {
+    vector<vector<Successor>> &graph, int min_ops_per_label, int min_occurences_per_label) {
     OpsToLabelId ops_to_label_id;
 
     int num_transitions_before_lr = 0;
@@ -175,13 +175,14 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         }
 
         for (auto &[transitions, ops] : equivalence_groups) {
-            if (ops.size() == 1) {
+            if (ops.size() == 1 || static_cast<int>(transitions.size()) < min_occurences_per_label) {
                 int op = ops[0];
                 for (const auto &[src, target] : transitions) {
                     ++num_non_label_transitions;
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
+                sort(ops.begin(), ops.end());
                 int label_id = create_or_reuse_label(ops_to_label_id, move(ops));
 
                 for (const auto &[src, target] : transitions) {
@@ -200,10 +201,19 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
             }
         }
 
+        phmap::flat_hash_map<vector<int>, int, VectorHash> label_usage_counts;
+        for (auto &[src_target, ops] : transition_groups) {
+            if (static_cast<int>(ops.size()) >= min_ops_per_label) {
+                sort(ops.begin(), ops.end());
+                label_usage_counts[ops]++;
+            }
+        }
+
         for (auto &[src_target, ops] : transition_groups) {
             const auto &[src, target] = src_target;
 
-            if (static_cast<int>(ops.size()) < min_ops_per_label) {
+            if (static_cast<int>(ops.size()) < min_ops_per_label ||
+                label_usage_counts[ops] < min_occurences_per_label) {
                 for (int op : ops) {
                     ++num_non_label_transitions;
                     new_graph[target].emplace_back(op, src);
@@ -227,7 +237,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
 #ifndef NDEBUG
     for (int idx = 0; idx < static_cast<int>(label_id_to_ops.size()); ++idx) {
         const auto &ops = label_id_to_ops[idx];
-        utils::g_log << "Label ID " << -(idx - 1) << ": [";
+        utils::g_log << "Label ID " << -(idx + 1) << ": [";
         for (int i = 0; i < static_cast<int>(ops.size()); ++i) {
             utils::g_log << ops[i];
             if (i < static_cast<int>(ops.size()) - 1)

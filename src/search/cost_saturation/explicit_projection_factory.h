@@ -24,6 +24,7 @@ class ExplicitProjectionFactory {
     std::vector<bool> looping_operators;
     std::vector<int> goal_states;
     int min_ops_per_label;
+    int min_occurences_per_label;
 
     // size of the PDB
     int num_states;
@@ -57,7 +58,8 @@ public:
     ExplicitProjectionFactory(
         const TaskProxy &task_proxy,
         const pdbs::Pattern &pattern,
-        int min_ops_per_label);
+        int min_ops_per_label,
+        int min_occurences_per_label);
 
     std::unique_ptr<Abstraction> convert_to_abstraction();
 };
