@@ -100,7 +100,7 @@ ExplicitAbstraction::ExplicitAbstraction(
     vector<bool> &&looping_operators,
     vector<int> &&goal_states,
     int min_ops_per_label,
-    int min_occurences_per_label)
+    int min_occurrences_per_label)
     : Abstraction(move(abstraction_function)),
       num_non_label_transitions(0),
       num_label_transitions(0),
@@ -110,7 +110,7 @@ ExplicitAbstraction::ExplicitAbstraction(
       ops_pool(),
       label_id_to_ops(),
       next_label_id(-1),
-      backward_graph(move(label_reduction(backward_graph_, min_ops_per_label, min_occurences_per_label))),
+      backward_graph(move(label_reduction(backward_graph_, min_ops_per_label, min_occurrences_per_label))),
       active_operators(get_active_operators_from_graph(
                            backward_graph, looping_operators.size(), label_id_to_ops)),
       looping_operators(move(looping_operators)),
@@ -148,7 +148,7 @@ int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId &ops_to_label_id, ve
 }
 
 vector<vector<Successor>> ExplicitAbstraction::label_reduction(
-    vector<vector<Successor>> &graph, int min_ops_per_label, int min_occurences_per_label) {
+    vector<vector<Successor>> &graph, int min_ops_per_label, int min_occurrences_per_label) {
     OpsToLabelId ops_to_label_id;
 
     int num_transitions_before_lr = 0;
@@ -175,7 +175,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
         }
 
         for (auto &[transitions, ops] : equivalence_groups) {
-            if (ops.size() == 1 || static_cast<int>(transitions.size()) < min_occurences_per_label) {
+            if (ops.size() == 1 || static_cast<int>(transitions.size()) < min_occurrences_per_label) {
                 int op = ops[0];
                 for (const auto &[src, target] : transitions) {
                     ++num_non_label_transitions;
@@ -213,7 +213,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
             const auto &[src, target] = src_target;
 
             if (static_cast<int>(ops.size()) < min_ops_per_label ||
-                label_usage_counts[ops] < min_occurences_per_label) {
+                label_usage_counts[ops] < min_occurrences_per_label) {
                 for (int op : ops) {
                     ++num_non_label_transitions;
                     new_graph[target].emplace_back(op, src);

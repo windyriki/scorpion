@@ -53,7 +53,7 @@ CartesianAbstractionGenerator::CartesianAbstractionGenerator(
     cartesian_abstractions::PickSplit tiebreak_split,
     int max_concrete_states_per_abstract_state, int max_state_expansions,
     cartesian_abstractions::TransitionRepresentation transition_representation,
-    int memory_padding, int min_ops_per_label, int min_occurences_per_label, int random_seed,
+    int memory_padding, int min_ops_per_label, int min_occurrences_per_label, int random_seed,
     cartesian_abstractions::DotGraphVerbosity dot_graph_verbosity,
     utils::Verbosity verbosity)
     : AbstractionGenerator(verbosity),
@@ -69,7 +69,7 @@ CartesianAbstractionGenerator::CartesianAbstractionGenerator(
       max_state_expansions(max_state_expansions),
       extra_memory_padding_mb(memory_padding),
       min_ops_per_label(min_ops_per_label),
-      min_occurences_per_label(min_occurences_per_label),
+      min_occurrences_per_label(min_occurrences_per_label),
       rng(utils::get_rng(random_seed)),
       dot_graph_verbosity(dot_graph_verbosity),
       num_states(0),
@@ -143,7 +143,7 @@ void CartesianAbstractionGenerator::build_abstractions_for_subtasks(
                     cartesian_abstraction->get_goals().begin(),
                     cartesian_abstraction->get_goals().end()),
                 min_ops_per_label,
-                min_occurences_per_label);
+                min_occurrences_per_label);
 
             for (const auto &[label_size, counts] : abstraction->get_label_size_counts()) {
                 total_label_size_counts[label_size] += counts;
@@ -245,8 +245,8 @@ public:
             "infinity",
             plugins::Bounds("0", "infinity"));
         add_option<int>(
-            "min_occurences_per_label",
-            "minimum number of occurences a label must have",
+            "min_occurrences_per_label",
+            "minimum number of occurrences a label must have",
             "1",
             plugins::Bounds("1", "infinity"));
         utils::add_log_options_to_feature(*this);
@@ -269,7 +269,7 @@ public:
             opts.get<cartesian_abstractions::TransitionRepresentation>("transition_representation"),
             opts.get<int>("memory_padding"),
             opts.get<int>("min_ops_per_label"),
-            opts.get<int>("min_occurences_per_label"),
+            opts.get<int>("min_occurrences_per_label"),
             utils::get_rng_arguments_from_options(opts),
             opts.get<cartesian_abstractions::DotGraphVerbosity>("dot_graph_verbosity"),
             opts.get<utils::Verbosity>("verbosity"));

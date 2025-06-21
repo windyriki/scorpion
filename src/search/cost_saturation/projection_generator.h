@@ -14,7 +14,7 @@ class ProjectionGenerator : public AbstractionGenerator {
     const bool combine_labels;
     const bool create_complete_transition_system;
     const int min_ops_per_label;
-    const int min_occurences_per_label;
+    const int min_occurrences_per_label;
 
     int num_transitions;
     int num_total_non_label_transitions;
@@ -32,7 +32,7 @@ public:
         bool combine_labels,
         bool create_complete_transition_system,
         int min_ops_per_label,
-        int min_occurences_per_label,
+        int min_occurrences_per_label,
         utils::Verbosity verbosity);
 
     virtual Abstractions generate_abstractions(
