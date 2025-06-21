@@ -176,10 +176,11 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
 
         for (auto &[transitions, ops] : equivalence_groups) {
             if (ops.size() == 1 || static_cast<int>(transitions.size()) < min_occurrences_per_label) {
-                int op = ops[0];
-                for (const auto &[src, target] : transitions) {
-                    ++num_non_label_transitions;
-                    new_graph[target].emplace_back(op, src);
+                for (int op : ops) {
+                    for (const auto &[src, target] : transitions) {
+                        ++num_non_label_transitions;
+                        new_graph[target].emplace_back(op, src);
+                    }
                 }
             } else {
                 sort(ops.begin(), ops.end());
