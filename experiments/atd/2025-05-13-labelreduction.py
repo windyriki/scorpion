@@ -72,7 +72,7 @@ def add_search_started(run):
     return run
 
 
-GIT_REV_WLR = "ef09336620f6cf8b69e3299d51e509f288858e52"
+GIT_REV_WLR = "dd4a35af89cce69f1fd408957c05a33751b4b2b5"
 GIT_REV_WOLR = "bbb134d94c4c59c2a09e4077b4e31c0006bf5d71"
 exp = FastDownwardExperiment(environment=ENV)
 exp.add_parser(FastDownwardExperiment.EXITCODE_PARSER)
@@ -102,24 +102,28 @@ exp.add_algorithm(
     driver_options=DRIVER,
 )
 
-MIN_OPS_PER_LABEL_VALUES = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 500, 1000]
+MIN_OPS_PER_LABEL_VALUES = [0, 2]
+MIN_OCCURRENCES_PER_LABEL_VALUES = [1, 2, 5, 10, 20, 50]
 
 for min_ops in MIN_OPS_PER_LABEL_VALUES:
-    exp.add_algorithm(
-        f"with label reduction (min_ops_per_label={min_ops})",
-        project.SCORPION_DIR,
-        GIT_REV_WLR,
-        [
-            "--search",
-            f"""astar(scp([cartesian(subtasks=[landmarks(order=random,random_seed=0)],random_seed=0, 
-            min_ops_per_label={min_ops}),
-            cartesian(subtasks=[goals(order=random,random_seed=0)], min_ops_per_label={min_ops}),
-            projections(systematic(2), create_complete_transition_system=true, min_ops_per_label={min_ops})],
-            max_orders=1K, diversify=false, max_time=infinity, max_optimization_time=0))""",
-        ],
-        build_options=BUILD,
-        driver_options=DRIVER,
-    )
+    for min_occurrences in MIN_OCCURRENCES_PER_LABEL_VALUES:
+        exp.add_algorithm(
+            f"with label reduction (min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences})",
+            project.SCORPION_DIR,
+            GIT_REV_WLR,
+            [
+                "--search",
+                f"""astar(scp([cartesian(subtasks=[landmarks(order=random,random_seed=0)],random_seed=0, 
+                min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences}),
+                cartesian(subtasks=[goals(order=random,random_seed=0)], min_ops_per_label={min_ops},
+                min_occurrences_per_label={min_occurrences}),
+                projections(systematic(2), create_complete_transition_system=true, min_ops_per_label={min_ops}, 
+                min_occurrences_per_label={min_occurrences})],
+                max_orders=1K, diversify=false, max_time=infinity, max_optimization_time=0))""",
+            ],
+            build_options=BUILD,
+            driver_options=DRIVER,
+        )
 
 exp.add_suite(project.DOMAINS_DIR, SUITE)
 
