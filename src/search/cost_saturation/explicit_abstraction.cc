@@ -108,7 +108,6 @@ ExplicitAbstraction::ExplicitAbstraction(
       label_size_counts(),
       reused_label_size_counts(),
       ops_pool(),
-      ops_to_label_id(),
       label_id_to_ops(),
       next_label_id(-1),
       backward_graph(move(label_reduction(backward_graph_, min_ops_per_label))),
@@ -129,11 +128,11 @@ ExplicitAbstraction::ExplicitAbstraction(
 #endif
 }
 
-int ExplicitAbstraction::create_or_reuse_label(vector<int> &&ops) {
+int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId ops_to_label_id, vector<int> &&ops) {
     sort(ops.begin(), ops.end());
     this->ops_pool.push_back(move(ops));
     const auto &ops_slice = this->ops_pool.back();
-    const auto [it, inserted] = this->ops_to_label_id.emplace(ops_slice, next_label_id);
+    const auto [it, inserted] = ops_to_label_id.emplace(ops_slice, next_label_id);
     if (inserted) {
         this->label_id_to_ops.emplace_back(it->first);
         --next_label_id;
@@ -150,6 +149,8 @@ int ExplicitAbstraction::create_or_reuse_label(vector<int> &&ops) {
 
 vector<vector<Successor>> ExplicitAbstraction::label_reduction(
     vector<vector<Successor>> &graph, int min_ops_per_label) {
+    OpsToLabelId ops_to_label_id;
+
     int num_transitions_before_lr = 0;
     // Retrieve non-looping transitions.
     vector<vector<Successor>> new_graph(graph.size());
@@ -181,7 +182,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
-                int label_id = create_or_reuse_label(move(ops));
+                int label_id = create_or_reuse_label(ops_to_label_id, move(ops));
 
                 for (const auto &[src, target] : transitions) {
                     ++num_label_transitions;
@@ -208,7 +209,7 @@ vector<vector<Successor>> ExplicitAbstraction::label_reduction(
                     new_graph[target].emplace_back(op, src);
                 }
             } else {
-                int label_id = create_or_reuse_label(move(ops));
+                int label_id = create_or_reuse_label(ops_to_label_id, move(ops));
                 ++num_label_transitions;
                 new_graph[target].emplace_back(label_id, src);
             }

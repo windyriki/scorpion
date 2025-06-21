@@ -39,7 +39,6 @@ class ExplicitAbstraction : public Abstraction {
     phmap::flat_hash_map<int, int> reused_label_size_counts;
 
     OpsPool ops_pool;
-    OpsToLabelId ops_to_label_id;
     LabelIdToOps label_id_to_ops;
     int next_label_id;
 
@@ -64,7 +63,7 @@ public:
         std::vector<int> &&goal_states,
         int min_ops_per_label);
 
-    virtual int create_or_reuse_label(std::vector<int> &&ops_sorted);
+    virtual int create_or_reuse_label(OpsToLabelId ops_to_label_id, std::vector<int> &&ops_sorted);
     virtual int get_num_non_label_transitions() const override {return num_non_label_transitions;}
     virtual int get_num_label_transitions() const override {return num_label_transitions;}
     virtual int get_num_labels() const override {return num_labels;}
