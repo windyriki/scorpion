@@ -110,7 +110,7 @@ ExplicitAbstraction::ExplicitAbstraction(
       ops_pool(),
       label_id_to_ops(),
       next_label_id(-1),
-      backward_graph(move(label_reduction(backward_graph_, min_ops_per_label, min_occurrences_per_label))),
+      backward_graph(label_reduction(backward_graph_, min_ops_per_label, min_occurrences_per_label)),
       active_operators(get_active_operators_from_graph(
                            backward_graph, looping_operators.size(), label_id_to_ops)),
       looping_operators(move(looping_operators)),
@@ -130,17 +130,17 @@ ExplicitAbstraction::ExplicitAbstraction(
 
 int ExplicitAbstraction::create_or_reuse_label(OpsToLabelId &ops_to_label_id, vector<int> &&ops) {
     assert(utils::is_sorted_unique(ops));
-    this->ops_pool.push_back(move(ops));
-    const auto &ops_slice = this->ops_pool.back();
+    ops_pool.push_back(move(ops));
+    const auto &ops_slice = ops_pool.back();
     const auto [it, inserted] = ops_to_label_id.emplace(ops_slice, next_label_id);
     if (inserted) {
-        this->label_id_to_ops.emplace_back(it->first);
+        label_id_to_ops.emplace_back(it->first);
         --next_label_id;
 
         ++num_labels;
         ++label_size_counts[ops_slice.size()];
     } else {
-        this->ops_pool.pop_back();
+        ops_pool.pop_back();
 
         ++reused_label_size_counts[it->first.size()];
     }

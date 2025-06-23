@@ -71,7 +71,7 @@ public:
     virtual phmap::flat_hash_map<int, int> get_label_size_counts() const override {return label_size_counts;}
     virtual phmap::flat_hash_map<int, int> get_reused_label_size_counts() const override {return reused_label_size_counts;}
     virtual std::vector<std::vector<Successor>> label_reduction(
-        std::vector<std::vector<Successor>> &graph, int min_ops_per_labelm, int min_occurrences_per_label);
+        std::vector<std::vector<Successor>> &graph, int min_ops_per_label, int min_occurrences_per_label);
     virtual std::vector<int> compute_goal_distances(
         const std::vector<int> &costs) const override;
     virtual std::vector<int> compute_saturated_costs(
