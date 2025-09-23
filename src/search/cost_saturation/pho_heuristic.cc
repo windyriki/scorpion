@@ -12,86 +12,120 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/logging.h"
 #include "projection.h"
-#include "../task_proxy.h"
-#include "types.h"
+#include <fstream>
 
 using namespace std;
-
+ofstream training_data_file;
+ofstream mapping_file;
 namespace cost_saturation {
-/*
-  The implementation currently computes weighted lookup tables for PhO and
-  holds them in memory. A more efficient implementation would only store the
+    /*
+    The implementation currently computes weighted lookup tables for PhO and
+    holds them in memory. A more efficient implementation would only store the
   weights and compute the weighted heuristic values on the fly when evaluating
   a state.
-*/
-PhO::PhO(
-    const Abstractions &abstractions, const vector<int> &costs,
-    lp::LPSolverType solver_type, bool saturated, const utils::LogProxy &log,
-    std::shared_ptr<AbstractTask> task_ptr, bool ppc)
-    : lp_solver(solver_type), solver_type(solver_type), saturated(saturated), log(log), task_ptr(task_ptr), ppc(ppc) {
-        double infinity = lp_solver.get_infinity();
-        int num_abstractions = abstractions.size();
-        int num_operators = costs.size();
-            // ppc is now a member variable
-
-    saturated_costs_by_abstraction.reserve(num_abstractions);
-    h_values_by_abstraction.reserve(num_abstractions);
-    for (int i = 0; i < num_abstractions; ++i) {
-        const Abstraction &abstraction = *abstractions[i];
-        vector<int> h_values = abstraction.compute_goal_distances(costs);
-        vector<int> saturated_costs =
-            abstraction.compute_saturated_costs(h_values);
-        h_values_by_abstraction.push_back(move(h_values));
-        saturated_costs_by_abstraction.push_back(move(saturated_costs));
-    }
-
-    named_vector::NamedVector<lp::LPVariable> variables;
-    variables.reserve(num_abstractions);
-    for (int i = 0; i < num_abstractions; ++i) {
-        // Objective coefficients are set below.
-        variables.emplace_back(0, infinity, 0);
-    }
-
-    named_vector::NamedVector<lp::LPConstraint> constraints;
-    constraints.reserve(num_operators);
-    for (int op_id = 0; op_id < num_operators; ++op_id) {
-        lp::LPConstraint constraint(-infinity, costs[op_id]);
-        for (int i = 0; i < num_abstractions; ++i) {
-            if (saturated) {
-                int scf_h = saturated_costs_by_abstraction[i][op_id];
-                if (scf_h == -INF) {
-                    // The constraint is always satisfied and we can ignore it.
-                    continue;
-                }
-                if (scf_h != 0) {
-                    constraint.insert(i, scf_h);
-                }
-            } else if (
-                abstractions[i]->operator_is_active(op_id) &&
-                costs[op_id] != 0) {
-                constraint.insert(i, costs[op_id]);
+  */
+  PhO::PhO(
+      const Abstractions &abstractions, const vector<int> &costs,
+      lp::LPSolverType solver_type, bool saturated, const utils::LogProxy &log, 
+      bool ppc, std::shared_ptr<AbstractTask> task_ptr, string output_file)
+      : lp_solver(solver_type),
+      print_lp_solver(solver_type),
+      saturated(saturated), log(log),
+      ppc(ppc),
+      task_proxy(*task_ptr),
+      output_file(output_file) {
+          double infinity = lp_solver.get_infinity();
+          int num_abstractions = abstractions.size();
+          int num_operators = costs.size();
+          
+          saturated_costs_by_abstraction.reserve(num_abstractions);
+          h_values_by_abstraction.reserve(num_abstractions);
+          for (int i = 0; i < num_abstractions; ++i) {
+              const Abstraction &abstraction = *abstractions[i];
+              vector<int> h_values = abstraction.compute_goal_distances(costs);
+              vector<int> saturated_costs =
+              abstraction.compute_saturated_costs(h_values);
+              h_values_by_abstraction.push_back(move(h_values));
+              saturated_costs_by_abstraction.push_back(move(saturated_costs));
             }
+            
+            named_vector::NamedVector<lp::LPVariable> variables;
+            variables.reserve(num_abstractions);
+            for (int i = 0; i < num_abstractions; ++i) {
+                // Objective coefficients are set below.
+                variables.emplace_back(0, infinity, 0);
+            }
+            
+            named_vector::NamedVector<lp::LPConstraint> constraints;
+            constraints.reserve(num_operators);
+            for (int op_id = 0; op_id < num_operators; ++op_id) {
+                lp::LPConstraint constraint(-infinity, costs[op_id]);
+                for (int i = 0; i < num_abstractions; ++i) {
+                    if (saturated) {
+                        int scf_h = saturated_costs_by_abstraction[i][op_id];
+                        if (scf_h == -INF) {
+                            // The constraint is always satisfied and we can ignore it.
+                            continue;
+                        }
+                        if (scf_h != 0) {
+                            constraint.insert(i, scf_h);
+                        }
+                    } else if (
+                        abstractions[i]->operator_is_active(op_id) &&
+                        costs[op_id] != 0) {
+                            constraint.insert(i, costs[op_id]);
+                        }
+                }
+                if (!constraint.empty()) {
+                    constraints.push_back(move(constraint));
+                }
+            }
+                
+            lp::LinearProgram lp(
+                lp::LPObjectiveSense::MAXIMIZE, move(variables), move(constraints),
+                lp_solver.get_infinity());
+            lp_solver.load_problem(lp);
+        
+        // Print out header for training data file
+        string filename = output_file + "_ppc_training_data.csv";
+        ofstream clear_file(filename, ios::out | ios::trunc);
+        clear_file.close();
+        training_data_file.open(filename, ios::app);
+        if (!training_data_file.is_open()) {
+            cerr << "Failed to open training data file: " << filename << endl;
+        } else {
+            training_data_file << "state; perfect_pattern_collection" << endl;
         }
-        if (!constraint.empty()) {
-            constraints.push_back(move(constraint));
-        }
-    }
 
-    lp::LinearProgram lp(
-        lp::LPObjectiveSense::MAXIMIZE, move(variables), move(constraints),
-        lp_solver.get_infinity());
-    lp_solver.load_problem(lp);
+        // Print out mapping
+        string mapping_filename = output_file + "_mapping.csv";
+        clear_file.open(mapping_filename, ios::out | ios::trunc);
+        clear_file.close();
+        mapping_file.open(mapping_filename, ios::app);
+        if (!mapping_file.is_open()) {
+            cerr << "Failed to open mapping file: " << mapping_filename << endl;
+        } else {
+            mapping_file << "id; string" << endl;
+        }
+        State state = task_proxy.get_initial_state();
+        for (size_t i = 0; i < state.size(); ++i) {
+            string state_atom = state[i].get_name();
+            // Remove "Negated" and/or "Atom" prefix
+            if (state_atom.front() == 'N') {
+                state_atom.erase(0, 12);
+            } else {
+                state_atom.erase(0, 5);
+            }
+            mapping_file << i << "; ";
+            mapping_file << state_atom << endl;
+        }
 }
 
 CostPartitioningHeuristic PhO::compute_cost_partitioning(
     const Abstractions &abstractions, const vector<int> &,
     const vector<int> &costs, const vector<int> &abstract_state_ids) {
     int num_abstractions = abstractions.size();
-    cout << "Computing cost partitioning" << endl;
     int num_operators = costs.size();
-
-    // Create a TaskProxy from the stored task_ptr
-    TaskProxy task_proxy(*task_ptr);
 
     double min_h = std::numeric_limits<double>::infinity();
     for (int i = 0; i < num_abstractions; ++i) {
@@ -108,7 +142,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             return cp_heuristic;
         }
         lp_solver.set_objective_coefficient(i, h);
-        if (h > 0 && h < min_h) {
+        if (h < min_h) {
             min_h = h;
         }
     }
@@ -144,31 +178,25 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
 
 
     if (ppc) {
-        // Print for every evaluated state (no guard)
-
-        // Use a separate LP solver for the second LP (printing only)
-        lp::LPSolver print_lp_solver(solver_type);
-
         // After solving the first LP
         double prev_obj_value = lp_solver.get_objective_value();
-
-        // Prepare variables for the new LP
-        named_vector::NamedVector<lp::LPVariable> variables;
-        double infinity = lp_solver.get_infinity();
-        // Compute M for the big-M constraint: if min_h > 0, use prev_obj_value / min_h, else use prev_obj_value.
         double M = (min_h > 0) ? (prev_obj_value / min_h) : prev_obj_value;
+        double infinity = print_lp_solver.get_infinity();
 
-        // Add weight variables (as before)
+        named_vector::NamedVector<lp::LPVariable> variables;
+        variables.reserve(2* num_abstractions);
         for (int i = 0; i < num_abstractions; ++i) {
-            variables.emplace_back(0, infinity, 0); // objective coeff set below
+            // Objective coeff are set below
+            variables.emplace_back(0, infinity, 0); 
         }
 
         // Add binary variables
         for (int i = 0; i < num_abstractions; ++i) {
+            // Objective coeff are set below
             variables.emplace_back(0, 1, 0, true); // is_integer = true
         }
 
-        // Prepare constraints (copy from first LP)
+        // Kopie vom 1.LP #TODO: Shortcut suchen
         named_vector::NamedVector<lp::LPConstraint> constraints;
         constraints.reserve(num_operators);
         for (int op_id = 0; op_id < num_operators; ++op_id) {
@@ -186,8 +214,8 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
                 } else if (
                     abstractions[i]->operator_is_active(op_id) &&
                     costs[op_id] != 0) {
-                    constraint.insert(i, costs[op_id]);
-                }
+                        constraint.insert(i, costs[op_id]);
+                    }
             }
             if (!constraint.empty()) {
                 constraints.push_back(move(constraint));
@@ -195,18 +223,18 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
         }
 
         // Add constraint: sum_i w_i * h_i >= prev_obj_value
-        lp::LPConstraint obj_constraint(prev_obj_value, infinity);
+        lp::LPConstraint constraint_w(prev_obj_value, infinity);
         for (int i = 0; i < num_abstractions; ++i) {
-            obj_constraint.insert(i, h_values_by_abstraction[i][abstract_state_ids[i]]);
+            constraint_w.insert(i, h_values_by_abstraction[i][abstract_state_ids[i]]);
         }
-        constraints.push_back(obj_constraint);
+        constraints.push_back(constraint_w);
 
         // Add constraints: b_i * M >= w_i for each i
         for (int i = 0; i < num_abstractions; ++i) {
-            lp::LPConstraint bin_constraint(0, infinity);
-            bin_constraint.insert(i, -1); // -w_i
-            bin_constraint.insert(num_abstractions + i, M); // +M * b_i
-            constraints.push_back(bin_constraint);
+            lp::LPConstraint constraint_b(0, infinity);
+            constraint_b.insert(i, -1); // -w_i
+            constraint_b.insert(num_abstractions + i, M); // +M * b_i
+            constraints.push_back(constraint_b);
         }
 
         // Set objective: minimize sum_i b_i * N_i
@@ -222,21 +250,77 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
         print_lp_solver.solve();
 
         vector<double> min_solution = print_lp_solver.extract_solution();
+        State state = task_proxy.get_initial_state();
+        for (size_t i = 0; i < state.size(); ++i) {
+            string state_atom = state[i].get_name();
+            // Ignore negatedAtoms as they can be implicitly assumed to be false if not present
+            if (state_atom.front() == 'N') {
+                continue;
+            }
+            if(i !=0 ) training_data_file << ", ";
+            training_data_file << i;
+        }
+        training_data_file << "; [";
+        bool first_pattern = true;
+        for (int i = 0; i < num_abstractions; ++i) {
+            double b_i = min_solution[num_abstractions + i];
+            if (b_i > 0.5) {
+                if (!first_pattern) {
+                    training_data_file << ", ";
+                }
+                first_pattern = false;
+                const Projection *proj = dynamic_cast<const Projection *>(abstractions[i].get());
+                training_data_file << "[";
+                if (proj) {
+                    const vector<int> &pattern = proj->get_pattern();
+                    for (int var : pattern) {
+                        training_data_file << var;
+                        if (var != pattern.back()) {
+                            training_data_file << ", ";
+                        }   
+                    }
+                    training_data_file << "]";
+                }
+            }
+        }
+        training_data_file << "]" << endl;
+
+        #ifndef NDEBUG
+        // Print out facts of the current state
+        cout << "Initial state:" << endl;
+        for (size_t i = 0; i < state.size(); ++i) {
+            // cout << state[i] << endl;
+            string state_atom = state[i].get_name();
+            // Ignore negatedAtoms as they can be implicitly assumed to be false if not present
+            if (state_atom.front() == 'N') {
+                continue;
+            }
+            if(i !=0 ) cout << ", ";
+            cout << i << " ";
+            // Remove "Atom" prefix
+            cout << state_atom.erase(0, 5);
+        }
+        cout << endl;
+        cout << "Perfect pattern collection:" << endl;
         for (int i = 0; i < num_abstractions; ++i) {
             double b_i = min_solution[num_abstractions + i];
             if (b_i > 0.5) {
                 const Projection *proj = dynamic_cast<const Projection *>(abstractions[i].get());
+                cout << "[";
                 if (proj) {
                     const vector<int> &pattern = proj->get_pattern();
-                    cout << "Selected pattern for abstraction " << i << ": ";
                     for (int var : pattern) {
                         cout << var << " ";
-                        cout << task_proxy.get_variables()[var].get_fact(0).get_name().erase(0, 5) << " ";
+                        cout << task_proxy.get_variables()[var].get_fact(0).get_name().erase(0, 5);
+                        if (var != pattern.back()) {
+                            cout << ", ";
+                        }   
                     }
-                    cout << endl;
+                    cout << "] " << endl;
                 }
             }
         }
+        #endif
     }
     return cp_heuristic;
 }
@@ -252,7 +336,8 @@ public:
 
     add_options_for_cost_partitioning_heuristic(*this, "pho");
     add_option<bool>("saturated", "saturate costs", "true");
-    add_option<bool>("ppc", "enable post-processing constraint LP", "false");
+    add_option<bool>("ppc", "enable second LP to compute a perfect pattern collection for the state", "false");
+    add_option<string>("output_file", "file to output the perfect pattern collection + mapping",  "\"test\"");
     add_order_options(*this);
     lp::add_lp_solver_option_to_feature(*this);
     }
@@ -272,8 +357,9 @@ public:
             options.get<bool>("saturated"),
             utils::get_log_for_verbosity(
                 options.get<utils::Verbosity>("verbosity")),
+            options.get<bool>("ppc"),
             scaled_costs_task,
-            options.get<bool>("ppc"));
+            options.get<string>("output_file"));
         CPFunction cp_function = [&pho](
                                      const Abstractions &abstractions_,
                                      const vector<int> &order_,

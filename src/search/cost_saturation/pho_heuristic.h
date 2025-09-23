@@ -6,26 +6,29 @@
 #include "../lp/lp_solver.h"
 #include "../utils/logging.h"
 #include "utils.h"
+#include "../task_proxy.h"
 
 #include <vector>
 
 namespace cost_saturation {
 class PhO {
     lp::LPSolver lp_solver;
-    lp::LPSolverType solver_type; // store solver type for second LP
+    lp::LPSolver print_lp_solver;
     std::vector<std::vector<int>> h_values_by_abstraction;
     bool saturated;
     std::vector<std::vector<int>> saturated_costs_by_abstraction;
     utils::LogProxy log;
-    std::shared_ptr<AbstractTask> task_ptr;
     bool ppc;
+    TaskProxy task_proxy;
+    std::string output_file;
 
 public:
     PhO(const Abstractions &abstractions, const std::vector<int> &costs,
         lp::LPSolverType solver_type, bool saturated,
         const utils::LogProxy &log,
+        bool ppc,
         std::shared_ptr<AbstractTask> task_ptr,
-        bool ppc);
+        std::string output_file);
 
     CostPartitioningHeuristic compute_cost_partitioning(
         const Abstractions &abstractions, const std::vector<int> &order,
