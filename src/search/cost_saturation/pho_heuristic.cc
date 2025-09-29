@@ -12,6 +12,7 @@
 #include "../task_utils/task_properties.h"
 #include "../utils/logging.h"
 #include "projection.h"
+#include <cstddef>
 #include <fstream>
 
 using namespace std;
@@ -267,6 +268,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
         }
         training_data_file << "; [";
 
+        size_t used_pattern_size = 0;
         bool first_pattern = true;
         for (int i = 0; i < num_abstractions; ++i) {
             double b_i = min_solution[num_abstractions + i];
@@ -279,6 +281,9 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
                 training_data_file << "[";
                 if (proj) {
                     const vector<int> &pattern = proj->get_pattern();
+                    if (pattern.size() > used_pattern_size) {
+                        used_pattern_size = pattern.size();
+                    }
                     for (int var : pattern) {
                         // training_data_file << var;
                         training_data_file << task_proxy.get_variables()[var].get_fact(0).get_name().erase(0, 5);
@@ -291,6 +296,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             }
         }
         training_data_file << "]" << endl;
+        cout << "Maximum used pattern size: " << used_pattern_size << endl;
 
         #ifndef NDEBUG
         // Print out facts of the current state
