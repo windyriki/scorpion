@@ -248,7 +248,8 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             lp::LPObjectiveSense::MINIMIZE, std::move(variables), std::move(constraints), infinity);
         print_lp_solver.load_problem(new_lp);
         print_lp_solver.solve();
-
+        
+        // Print training data file
         vector<double> min_solution = print_lp_solver.extract_solution();
         State state = task_proxy.get_initial_state();
         for (size_t i = 0; i < state.size(); ++i) {
@@ -258,9 +259,14 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
                 continue;
             }
             if(i !=0 ) training_data_file << ", ";
-            training_data_file << i;
+            // training_data_file << i;
+            training_data_file << state[i].get_name().erase(0, 5);
+        }
+        for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {            
+            training_data_file << "g_" + task_proxy.get_goals()[i].get_name().erase(0, 5)<< ", ";
         }
         training_data_file << "; [";
+
         bool first_pattern = true;
         for (int i = 0; i < num_abstractions; ++i) {
             double b_i = min_solution[num_abstractions + i];
@@ -274,7 +280,8 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
                 if (proj) {
                     const vector<int> &pattern = proj->get_pattern();
                     for (int var : pattern) {
-                        training_data_file << var;
+                        // training_data_file << var;
+                        training_data_file << task_proxy.get_variables()[var].get_fact(0).get_name().erase(0, 5);
                         if (var != pattern.back()) {
                             training_data_file << ", ";
                         }   
