@@ -5,6 +5,7 @@ from downward.suites import build_suite
 from lab.environments import TetralithEnvironment, LocalEnvironment
 from lab.reports import Attribute, geometric_mean, arithmetic_mean
 from downward.reports.absolute import AbsoluteReport
+from downward.reports.taskwise import TaskwiseReport
 from downward.cached_revision import CachedFastDownwardRevision
 from downward.reports.compare import ComparativeReport
 from downward.reports.scatter import ScatterPlotReport
@@ -18,6 +19,7 @@ from pathlib import Path
 from functools import partial
 import json
 from custom_parser import CommonParser
+from labreports import PerTaskComparison
 
 USER = project.dfsplan
 
@@ -44,8 +46,8 @@ else:
     MIN = 1
     TIME_LIMIT = int(HOURS * 60 + MIN)
     MEMORY_LIMIT = "3G"
-    SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER
-    # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+    # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER
+    SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
     # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_EXTENDED 
     GENERATION_TIME = 10
     BUILD += ["-j8"] # core angabe
@@ -72,13 +74,14 @@ def add_search_started(run):
     return run
 
 
-GIT_REV_WLR = "dd4a35af89cce69f1fd408957c05a33751b4b2b5"
-GIT_REV_WOLR = "bbb134d94c4c59c2a09e4077b4e31c0006bf5d71"
+GIT_REV_WLR = "9b7cc91dbf4ac2bdfb69c788fefd969a0da7d59b"
+GIT_REV_WOLR = "9b7cc91dbf4ac2bdfb69c788fefd969a0da7d59b"
 exp = FastDownwardExperiment(environment=ENV)
 exp.add_parser(FastDownwardExperiment.EXITCODE_PARSER)
 exp.add_parser(FastDownwardExperiment.TRANSLATOR_PARSER)
 exp.add_parser(FastDownwardExperiment.SINGLE_SEARCH_PARSER)
 exp.add_parser(CommonParser())
+
 
 exp.add_resource("", "project.py")
 
@@ -86,44 +89,50 @@ exp.add_resource("", "project.py")
 #     "[cartesian(subtasks=[goals(order=random,random_seed=5555)],random_seed=5555)]"
 # ) random seed important if random orders
 
+# for task in SUITE:
+# task_name_safe = Path(task).stem.replace(":", "_")
+# Path(task_name_safe).mkdir(parents=True, exist_ok=True)
 
 exp.add_algorithm(
-    f"without label reduction",
+    f"ppc",
     project.SCORPION_DIR,
     GIT_REV_WLR,
     [
         "--search",
-        f"""astar(scp([cartesian(subtasks=[landmarks(order=random,random_seed=0)],random_seed=0),
-        cartesian(subtasks=[goals(order=random,random_seed=0)]), 
-        projections(systematic(2), create_complete_transition_system=true)],
-        max_orders=1K, diversify=false, max_time=infinity, max_optimization_time=0))""",
+        f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size=infinity,
+        max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
+        max_time_per_restart=infinity, saturate=false, pattern_type=interesting_general,
+        ignore_useless_patterns=false, store_dead_ends=false))],
+        max_orders=1,samples=1,saturated=true,ppc=true, max_optimization_time=0,diversify=false,
+        output_file="test"),bound=0)"""
+        # output_file="{task_name_safe}"),bound=0)"""
     ],
     build_options=BUILD,
     driver_options=DRIVER,
 )
 
-MIN_OPS_PER_LABEL_VALUES = [0, 2]
-MIN_OCCURRENCES_PER_LABEL_VALUES = [1, 2, 5, 10, 20, 50]
+# MIN_OPS_PER_LABEL_VALUES = [0, 2]
+# MIN_OCCURRENCES_PER_LABEL_VALUES = [1, 2, 5, 10, 20, 50]
 
-for min_ops in MIN_OPS_PER_LABEL_VALUES:
-    for min_occurrences in MIN_OCCURRENCES_PER_LABEL_VALUES:
-        exp.add_algorithm(
-            f"with label reduction (min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences})",
-            project.SCORPION_DIR,
-            GIT_REV_WLR,
-            [
-                "--search",
-                f"""astar(scp([cartesian(subtasks=[landmarks(order=random,random_seed=0)],random_seed=0, 
-                min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences}),
-                cartesian(subtasks=[goals(order=random,random_seed=0)], min_ops_per_label={min_ops},
-                min_occurrences_per_label={min_occurrences}),
-                projections(systematic(2), create_complete_transition_system=true, min_ops_per_label={min_ops}, 
-                min_occurrences_per_label={min_occurrences})],
-                max_orders=1K, diversify=false, max_time=infinity, max_optimization_time=0))""",
-            ],
-            build_options=BUILD,
-            driver_options=DRIVER,
-        )
+# for min_ops in MIN_OPS_PER_LABEL_VALUES:
+#     for min_occurrences in MIN_OCCURRENCES_PER_LABEL_VALUES:
+#         exp.add_algorithm(
+#             f"with label reduction (min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences})",
+#             project.SCORPION_DIR,
+#             GIT_REV_WLR,
+#             [
+#                 "--search",
+#                 f"""astar(scp([cartesian(subtasks=[landmarks(order=random,random_seed=0)],random_seed=0, 
+#                 min_ops_per_label={min_ops}, min_occurrences_per_label={min_occurrences}),
+#                 cartesian(subtasks=[goals(order=random,random_seed=0)], min_ops_per_label={min_ops},
+#                 min_occurrences_per_label={min_occurrences}),
+#                 projections(systematic(2), create_complete_transition_system=true, min_ops_per_label={min_ops}, 
+#                 min_occurrences_per_label={min_occurrences})],
+#                 max_orders=1K, diversify=false, max_time=infinity, max_optimization_time=0))""",
+#             ],
+#             build_options=BUILD,
+#             driver_options=DRIVER,
+#         )
 
 exp.add_suite(project.DOMAINS_DIR, SUITE)
 
@@ -149,32 +158,13 @@ ATTRIBUTES = [ #schaue mal durch
     "expansions_until_last_jump",
     # "h_values",
     "search_time",
-    "cartesian1_num_transitions",
-    "cartesian2_num_transitions",
-    "projection_num_transitions",
-    "cartesian1_num_non_label_transitions",
-    "cartesian2_num_non_label_transitions",
-    "projection_num_non_label_transitions",
-    "cartesian1_num_label_transitions",
-    "cartesian2_num_label_transitions",
-    "projection_num_label_transitions",
-    "cartesian1_num_labels",
-    "cartesian2_num_labels",
-    "projection_num_labels",
-    "cartesian1_num_reused_labels",
-    "cartesian2_num_reused_labels",
-    "projection_num_reused_labels",
-    "num_transitions",
-    "change_in_size",
-    "num_non_label_transitions",
-    "num_label_transitions",
-    "num_labels",
-    "num_reused_labels",
-    "cp_time",
+    "max_ex_pattern_size",
+    "max_used_pattern_size",
     "search_start_time",
     "search_start_memory"
 ]
 
+exp.add_report(TaskwiseReport(attributes=["run_dir","max_ex_pattern_size", "max_used_pattern_size", "error"])),
 project.add_report(
     exp,
     attributes=ATTRIBUTES,
