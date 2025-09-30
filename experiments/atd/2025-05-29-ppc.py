@@ -31,7 +31,7 @@ REPO = project.get_repo_base()
 if project.REMOTE:
     ENV = TetralithEnvironment(
         email="windy.phung@liu.se",
-        extra_options="#SBATCH -A naiss2024-5-421", #naiss2024-5-404
+        extra_options="#SBATCH -A naiss2025-5-382",
         memory_per_cpu="9G",
     )
     HOURS = 0
