@@ -152,6 +152,12 @@ SUITE_OPTIMAL_STRIPS = [
     "zenotravel",
 ]
 
+SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER_SMALL = [
+    "gripper:prob01.pddl",
+    "gripper:prob02.pddl",
+    "gripper:prob20.pddl",
+]
+
 SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER = [
     "gripper",
 ]
