@@ -120,6 +120,10 @@ namespace cost_saturation {
             mapping_file << i << "; ";
             mapping_file << state_atom << endl;
         }
+        for (size_t i = 0; i < task_proxy.get_variables().size(); ++i) { 
+            cout << i << "; ";           
+            cout << task_proxy.get_variables()[i].get_fact(0).get_name()<< endl;
+        }
 }
 
 CostPartitioningHeuristic PhO::compute_cost_partitioning(
@@ -263,6 +267,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             // training_data_file << i;
             training_data_file << state[i].get_name().erase(0, 5);
         }
+        training_data_file << ", ";
         for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {            
             training_data_file << "g_" + task_proxy.get_goals()[i].get_name().erase(0, 5)<< ", ";
         }
