@@ -16,10 +16,16 @@ class CommonParser(Parser):
         "search_start_memory", r"\[t=.+s, (\d+) KB\] g=0, 1 evaluated, 0 expanded", type=int,
         )
         self.add_pattern (
-        "max_ex_pattern_size", r"Maximum pattern size: (\d+)", type=int
+        "max_pattern_size", r"Maximum pattern size: (\d+)", type=int
         )
         self.add_pattern (
-        "max_used_pattern_size", r"Maximum used pattern size: (\d+)", type=int
+        "max_pattern_size_in_ppc", r"Maximum used pattern size: (\d+)", type=int
+        )
+        self.add_pattern (
+        "number_patterns_in_ppc", r"Number of patterns in PPC: (\d+)", type=int
+        )
+        self.add_pattern (
+        "number_abstract_states", r"Number of abstract states: (\d+)", type=int
         )
         # self.add_indexed_pattern_mapping(
         #     r"Total number of transitions in Abstractions \(after label reduction\): (\d+)",

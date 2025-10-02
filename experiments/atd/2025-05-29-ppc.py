@@ -47,7 +47,7 @@ else:
     TIME_LIMIT = int(HOURS * 60 + MIN)
     MEMORY_LIMIT = "3G"
     # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER
-    SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+    SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER_SMALL
     # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_EXTENDED 
     GENERATION_TIME = 10
     BUILD += ["-j8"] # core angabe
@@ -74,8 +74,8 @@ def add_search_started(run):
     return run
 
 
-GIT_REV_WLR = "212029076ab1c083b0ea9f5e3f97b9c8a9182810"
-GIT_REV_WOLR = "212029076ab1c083b0ea9f5e3f97b9c8a9182810"
+GIT_REV_WLR = "348c4317450c36094585ec9cbc9ef22b9571e03f"
+GIT_REV_WOLR = "348c4317450c36094585ec9cbc9ef22b9571e03f"
 exp = FastDownwardExperiment(environment=ENV)
 exp.add_parser(FastDownwardExperiment.EXITCODE_PARSER)
 exp.add_parser(FastDownwardExperiment.TRANSLATOR_PARSER)
@@ -93,27 +93,30 @@ exp.add_resource("", "project.py")
 # task_name_safe = Path(task).stem.replace(":", "_")
 # Path(task_name_safe).mkdir(parents=True, exist_ok=True)
 
-exp.add_algorithm(
-    f"ppc",
-    project.SCORPION_DIR,
-    GIT_REV_WLR,
-    [
-        "--translate-options",
-        "--invariant-generation-max-candidates",
-        "0", 
-        "--search-options",
-        "--search",
-        f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size=infinity,
-        max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
-        max_time_per_restart=infinity, saturate=false, pattern_type=interesting_general,
-        ignore_useless_patterns=false, store_dead_ends=false))],
-        max_orders=1,samples=1,saturated=true,ppc=true, max_optimization_time=0,diversify=false,
-        output_file="test"),bound=0)"""
-        # output_file="{task_name_safe}"),bound=0)"""
-    ],
-    build_options=BUILD,
-    driver_options=DRIVER,
-)
+MAX_PATTERN_SIZE_VALUES = [2,3,4,5,6,7,8,9,10]
+
+for max_pattern_size_value in MAX_PATTERN_SIZE_VALUES:
+    exp.add_algorithm(
+        f"ppc (max_pattern_size={max_pattern_size_value})",
+        project.SCORPION_DIR,
+        GIT_REV_WLR,
+        [
+            "--translate-options",
+            "--invariant-generation-max-candidates",
+            "0", 
+            "--search-options",
+            "--search",
+            f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size={max_pattern_size_value},
+            max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
+            max_time_per_restart=infinity, saturate=false, pattern_type=interesting_general,
+            ignore_useless_patterns=false, store_dead_ends=false))],
+            max_orders=1,samples=1,saturated=true,ppc=true, max_optimization_time=0,diversify=false,
+            output_file="test"),bound=0)"""
+            # output_file="{task_name_safe}"),bound=0)"""
+        ],
+        build_options=BUILD,
+        driver_options=DRIVER,
+    )
 
 # MIN_OPS_PER_LABEL_VALUES = [0, 2]
 # MIN_OCCURRENCES_PER_LABEL_VALUES = [1, 2, 5, 10, 20, 50]
@@ -162,13 +165,15 @@ ATTRIBUTES = [ #schaue mal durch
     "expansions_until_last_jump",
     # "h_values",
     "search_time",
-    "max_ex_pattern_size",
-    "max_used_pattern_size",
+    "max_pattern_size",
+    "max_pattern_size_in_ppc",
+    "number_patterns_in_ppc",
+    "number_abstract_states",
     "search_start_time",
     "search_start_memory"
 ]
 
-exp.add_report(TaskwiseReport(attributes=["run_dir","max_ex_pattern_size", "max_used_pattern_size", "error"])),
+# exp.add_report(TaskwiseReport(attributes=["run_dir","max_pattern_size", "max_pattern_size_in_ppc", "number_patterns_in_ppc", "number_abstract_states", "error"])),
 project.add_report(
     exp,
     attributes=ATTRIBUTES,
