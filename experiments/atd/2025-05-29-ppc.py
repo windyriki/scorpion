@@ -27,30 +27,52 @@ BUILD = [] #debug
 GENERATION_TIME = 100
 REVISION_CACHE = project.DIR / "data" / "revision-cache"
 REPO = project.get_repo_base()
+MANUAL_DEBUG = False
 
 if project.REMOTE:
-    ENV = TetralithEnvironment(
-        email="windy.phung@liu.se",
-        extra_options="#SBATCH -A naiss2025-5-382",
-        memory_per_cpu="9G",
-    )
-    HOURS = 0
-    MIN = 30
-    TIME_LIMIT = int(HOURS * 60 + MIN)
-    MEMORY_LIMIT = "8G"
-    SUITE = build_suite(project.DOMAINS_DIR, project.SUITE_OPTIMAL_STRIPS)
-    BUILD += ["-j4"]
+    if MANUAL_DEBUG:
+        ENV = TetralithEnvironment(
+            email="windy.phung@liu.se",
+            extra_options="#SBATCH -A naiss2025-5-382",
+            memory_per_cpu="9G",
+        )
+        HOURS = 0
+        MIN = 30
+        TIME_LIMIT = int(HOURS * 60 + MIN)
+        MEMORY_LIMIT = "8G"
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+        BUILD += ["-j4"]
+    else:
+        ENV = TetralithEnvironment(
+            email="windy.phung@liu.se",
+            extra_options="#SBATCH -A naiss2025-5-382",
+            memory_per_cpu="9G",
+        )
+        HOURS = 0
+        MIN = 30
+        TIME_LIMIT = int(HOURS * 60 + MIN)
+        MEMORY_LIMIT = "8G"
+        SUITE = build_suite(project.DOMAINS_DIR, project.SUITE_OPTIMAL_STRIPS)
+        BUILD += ["-j4"]
 else:
-    ENV = LocalEnvironment(processes=5)
-    HOURS = 0
-    MIN = 1
-    TIME_LIMIT = int(HOURS * 60 + MIN)
-    MEMORY_LIMIT = "3G"
-    # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER
-    SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_GRIPPER_SMALL
-    # SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_EXTENDED 
-    GENERATION_TIME = 10
-    BUILD += ["-j8"] # core angabe
+    if MANUAL_DEBUG:
+        ENV = LocalEnvironment(processes=5)
+        HOURS = 0
+        MIN = 30
+        TIME_LIMIT = int(HOURS * 60 + MIN)
+        MEMORY_LIMIT = "8G"
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_TINY
+        GENERATION_TIME = 10
+        BUILD += ["-j3"] # core angabe
+    else:
+        ENV = LocalEnvironment(processes=5)
+        HOURS = 0
+        MIN = 1
+        TIME_LIMIT = int(HOURS * 60 + MIN)
+        MEMORY_LIMIT = "3G"
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+        GENERATION_TIME = 10
+        BUILD += ["-j8"] # core angabe
 
 DRIVER = [
     "--overall-time-limit",
@@ -93,7 +115,10 @@ exp.add_resource("", "project.py")
 # task_name_safe = Path(task).stem.replace(":", "_")
 # Path(task_name_safe).mkdir(parents=True, exist_ok=True)
 
-MAX_PATTERN_SIZE_VALUES = [2,3,4,5,6,7,8,9,10]
+if MANUAL_DEBUG:
+    MAX_PATTERN_SIZE_VALUES = [2,4,6]
+else:
+    MAX_PATTERN_SIZE_VALUES = [2,3,4,5,6,7,8,9,10]
 
 for max_pattern_size_value in MAX_PATTERN_SIZE_VALUES:
     exp.add_algorithm(
