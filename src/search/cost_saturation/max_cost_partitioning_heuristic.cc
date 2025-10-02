@@ -41,6 +41,7 @@ static void log_info_about_stored_lookup_tables(
                  << num_total_values << " = "
                  << num_stored_values / static_cast<double>(num_total_values)
                  << endl;
+    cout << "Number of abstract states: " << num_stored_values << endl;
 }
 
 MaxCostPartitioningHeuristic::MaxCostPartitioningHeuristic(

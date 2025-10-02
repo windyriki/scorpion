@@ -263,9 +263,11 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
 
         size_t used_pattern_size = 0;
         bool first_pattern = true;
+        int num_patterns = 0;
         for (int i = 0; i < num_abstractions; ++i) {
             double b_i = min_solution[num_abstractions + i];
             if (b_i > 0.5) {
+                num_patterns++;
                 if (!first_pattern) {
                     training_data_file << ", ";
                 }
@@ -289,6 +291,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             }
         }
         training_data_file << "]" << endl;
+        cout << "Number of patterns in PPC: " << num_patterns << endl;
         cout << "Maximum used pattern size: " << used_pattern_size << endl;
 
         #ifndef NDEBUG
