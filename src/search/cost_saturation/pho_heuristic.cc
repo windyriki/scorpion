@@ -108,21 +108,9 @@ namespace cost_saturation {
         } else {
             mapping_file << "id; string" << endl;
         }
-        State state = task_proxy.get_initial_state();
-        for (size_t i = 0; i < state.size(); ++i) {
-            string state_atom = state[i].get_name();
-            // Remove "Negated" and/or "Atom" prefix
-            if (state_atom.front() == 'N') {
-                state_atom.erase(0, 12);
-            } else {
-                state_atom.erase(0, 5);
-            }
-            mapping_file << i << "; ";
-            mapping_file << state_atom << endl;
-        }
         for (size_t i = 0; i < task_proxy.get_variables().size(); ++i) { 
-            cout << i << "; ";           
-            cout << task_proxy.get_variables()[i].get_fact(0).get_name()<< endl;
+            mapping_file << i << "; ";           
+            mapping_file << task_proxy.get_variables()[i].get_fact(0).get_name().erase(0, 5)<< endl;
         }
 }
 
