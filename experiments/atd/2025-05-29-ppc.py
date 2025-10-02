@@ -74,8 +74,8 @@ def add_search_started(run):
     return run
 
 
-GIT_REV_WLR = "9b7cc91dbf4ac2bdfb69c788fefd969a0da7d59b"
-GIT_REV_WOLR = "9b7cc91dbf4ac2bdfb69c788fefd969a0da7d59b"
+GIT_REV_WLR = "212029076ab1c083b0ea9f5e3f97b9c8a9182810"
+GIT_REV_WOLR = "212029076ab1c083b0ea9f5e3f97b9c8a9182810"
 exp = FastDownwardExperiment(environment=ENV)
 exp.add_parser(FastDownwardExperiment.EXITCODE_PARSER)
 exp.add_parser(FastDownwardExperiment.TRANSLATOR_PARSER)
@@ -98,6 +98,10 @@ exp.add_algorithm(
     project.SCORPION_DIR,
     GIT_REV_WLR,
     [
+        "--translate-options",
+        "--invariant-generation-max-candidates",
+        "0", 
+        "--search-options",
         "--search",
         f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size=infinity,
         max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
