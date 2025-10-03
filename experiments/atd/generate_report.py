@@ -35,7 +35,7 @@ def create_report(properties_file, output_file='report.html'):
                 runs,
                 key=lambda r: (
                     r.get('max_pattern_size_in_ppc', -1),
-                    -r.get('max_pattern_size', float('inf'))
+                    r.get('max_pattern_size', -1)
                 ),
                 reverse=True
             )[0]
@@ -50,7 +50,7 @@ def generate_html(data, output_file):
     """Generates the HTML file from the processed data."""
     columns = [
         'problem', 'error', 'max_pattern_size', 'max_pattern_size_in_ppc',
-        'number_abstract_states', 'number_patterns_in_ppc', 'run_dir'
+        'number_abstract_states', 'number_patterns_in_ppc', 'translator_variables', 'run_dir'
     ]
     html = f"""
 <!DOCTYPE html>

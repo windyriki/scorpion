@@ -195,7 +195,8 @@ ATTRIBUTES = [ #schaue mal durch
     "number_patterns_in_ppc",
     "number_abstract_states",
     "search_start_time",
-    "search_start_memory"
+    "search_start_memory",
+    "translator_variables",
 ]
 
 # exp.add_report(TaskwiseReport(attributes=["run_dir","max_pattern_size", "max_pattern_size_in_ppc", "number_patterns_in_ppc", "number_abstract_states", "error"])),
