@@ -242,6 +242,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
         print_lp_solver.load_problem(new_lp);
         print_lp_solver.solve();
         
+        bool first_fact = true;
         // Print training data file
         vector<double> min_solution = print_lp_solver.extract_solution();
         State state = task_proxy.get_initial_state();
@@ -251,7 +252,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             if (state_atom.front() == 'N') {
                 continue;
             }
-            if(i !=0 ) training_data_file << ", ";
+            if(!first_fact) training_data_file << ", ";
             // training_data_file << i;
             training_data_file << state[i].get_name().erase(0, 5);
         }
@@ -295,6 +296,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
         cout << "Maximum used pattern size: " << used_pattern_size << endl;
 
         #ifndef NDEBUG
+        bool first_fact_debug = true;
         // Print out facts of the current state
         cout << "Initial state:" << endl;
         for (size_t i = 0; i < state.size(); ++i) {
@@ -304,10 +306,11 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             if (state_atom.front() == 'N') {
                 continue;
             }
-            if(i !=0 ) cout << ", ";
+            if(!first_fact_debug) cout << ", ";
             cout << i << " ";
             // Remove "Atom" prefix
             cout << state_atom.erase(0, 5);
+            first_fact_debug = false;
         }
         cout << endl;
         cout << "Perfect pattern collection:" << endl;
