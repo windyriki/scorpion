@@ -77,7 +77,7 @@ static vector<vector<string>> parse_pattern_file(const string &filename) {
 
         // Parse patterns separated by commas at the top level
         // Format: ["var1", "var2"], ["var3", "var4"]
-        size_t pos = 0;
+        size_t pos = 1;
         while (pos < line.size()) {
             // Find start of pattern '['
             size_t start = line.find('[', pos);
@@ -139,6 +139,86 @@ static vector<vector<string>> parse_pattern_file(const string &filename) {
     }
 
     if (patterns.empty()) {
+        cerr << "Warning: No patterns found in file: " << filename << endl;
+    }
+
+    return patterns;
+}
+
+// Helper function to parse pattern collections from a file (ID-based)
+// Expected format: [[1, 2, 3], [4, 5], [6, 7, 8, 9]]
+static shared_ptr<PatternCollection> parse_pattern_file_ids(const string &filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error: Could not open pattern file: " << filename << endl;
+        utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+    }
+
+    auto patterns = make_shared<PatternCollection>();
+    string line;
+    while (getline(file, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+
+        // Skip lines that don't contain pattern data (e.g., CSV headers without '[')
+        if (line.find('[') == string::npos) {
+            continue;
+        }
+
+        // Parse patterns: [[1, 2], [3, 4, 5]]
+        size_t pos = 0;
+        while (pos < line.size()) {
+            // Find start of pattern '['
+            size_t start = line.find('[', pos);
+            if (start == string::npos) break;
+            
+            // Check if this is the outer bracket (followed by another '[')
+            if (start + 1 < line.size() && line[start + 1] == '[') {
+                // Skip the outer opening bracket
+                pos = start + 1;
+                continue;
+            }
+            
+            // Find end of pattern ']'
+            size_t end = line.find(']', start);
+            if (end == string::npos) {
+                cerr << "Error: Malformed pattern in file (missing ']'): " << line << endl;
+                utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+            }
+
+            // Extract pattern content between brackets
+            string pattern_str = line.substr(start + 1, end - start - 1);
+            Pattern pattern;
+
+            // Parse comma-separated integers
+            istringstream iss(pattern_str);
+            string token;
+            while (getline(iss, token, ',')) {
+                // Trim whitespace and any remaining brackets
+                token.erase(0, token.find_first_not_of(" \t\n\r[]"));
+                token.erase(token.find_last_not_of(" \t\n\r[]") + 1);
+                
+                if (!token.empty()) {
+                    try {
+                        int id = stoi(token);
+                        pattern.push_back(id);
+                    } catch (const exception &e) {
+                        cerr << "Error: Invalid variable ID '" << token << "' in pattern file" << endl;
+                        utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+                    }
+                }
+            }
+
+            if (!pattern.empty()) {
+                patterns->push_back(pattern);
+            }
+            pos = end + 1;
+        }
+    }
+
+    if (patterns->empty()) {
         cerr << "Warning: No patterns found in file: " << filename << endl;
     }
 
@@ -224,7 +304,7 @@ public:
             "file",
             "path to a file containing pattern collection. "
             "Format: [\"holding(a)\", \"clear(b)\"], [\"on(a, b)\", \"handempty()\"]",
-            "");
+            "\"pattern.csv\"");
         add_generator_options_to_feature(*this);
     }
 
@@ -251,4 +331,46 @@ public:
 };
 
 static plugins::FeaturePlugin<PatternCollectionGeneratorManualStringFeature> _plugin_string;
+
+// Pattern collection generator that reads patterns from file using variable IDs
+class PatternCollectionGeneratorManualIDFeature
+    : public plugins::TypedFeature<
+          PatternCollectionGenerator, PatternCollectionGeneratorManual> {
+public:
+    PatternCollectionGeneratorManualIDFeature()
+        : TypedFeature("manual_patterns_id") {
+        add_option<string>(
+            "file",
+            "path to a file containing pattern collection using variable IDs. "
+            "Format: [[1, 2, 3], [4, 5], [6, 7, 8]]",
+            "\"patterns.txt\"");
+        add_generator_options_to_feature(*this);
+    }
+
+    virtual shared_ptr<PatternCollectionGeneratorManual> create_component(
+        const plugins::Options &opts) const override {
+        string file_path = opts.get<string>("file");
+
+        if (file_path.empty()) {
+            cerr << "Error: No file specified for manual_patterns_id." << endl;
+            utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+        }
+
+        // Read patterns from file (returns shared_ptr<PatternCollection>)
+        shared_ptr<PatternCollection> patterns = parse_pattern_file_ids(file_path);
+
+        if (patterns->empty()) {
+            cerr << "Error: No patterns found in file: " << file_path << endl;
+            utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+        }
+
+        // Use the helper function to create with proper argument unpacking
+        return plugins::make_shared_from_arg_tuples<
+            PatternCollectionGeneratorManual>(
+            *patterns,
+            get_generator_arguments_from_options(opts));
+    }
+};
+
+static plugins::FeaturePlugin<PatternCollectionGeneratorManualIDFeature> _plugin_file;
 }
