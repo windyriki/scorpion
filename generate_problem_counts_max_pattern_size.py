@@ -3,7 +3,6 @@ import pandas as pd
 import os
 from io import StringIO
 from typing import Dict, Any
-import re
 
 # --- CONFIGURATION ---
 INPUT_FILE_PATH = "experiments/atd/report_cluster.html"
@@ -50,34 +49,17 @@ except Exception as e:
 def generate_summary_df(soup: BeautifulSoup, count_column: str) -> pd.DataFrame:
     """Processes the parsed HTML to create a summary DataFrame based on a given column."""
     
-    # Walk through each domain header and pair it with the next table element.
-    # This avoids misalignment when the document contains extra tables (e.g. overall summaries).
+    # Extract domain names and tables
+    # Filter out non-domain h2 tags (like date stamps or report titles)
+    domains = [h2.text for h2 in soup.find_all("h2") if not h2.text.isupper() and h2.text not in ["2025-10-03", "taskwisereport"]]
+    tables = soup.find_all("table")
+
     data: list[Dict[Any, Any]] = []
-    for h2 in soup.find_all("h2"):
-        domain = h2.text
-        # Filter out non-domain h2 tags (like date stamps or report titles)
-        if domain.isupper() or domain in ["2025-10-03", "taskwisereport"]:
-            continue
-        table = h2.find_next("table")
-        if table is None:
-            continue
+
+    # Build per-domain problem counts by the specified column
+    for domain, table in zip(domains, tables):
         df = pd.read_html(str(table))[0]
         if count_column in df.columns:
-            # Ensure the count column is integer-typed so pandas produces integer
-            # column labels (avoid floats like 3.0 when values were parsed as floats).
-            try:
-                # Convert to numeric. For the PPC column we want to treat missing values
-                # as 0 (count them as size 0). For other columns, drop missing values.
-                df[count_column] = pd.to_numeric(df[count_column], errors='coerce')
-                if count_column == COLUMN_2:
-                    # Replace NaN/None with 0 so they are counted as size 0
-                    df[count_column] = df[count_column].fillna(0).astype(int)
-                else:
-                    # For other columns, drop rows with non-numeric / missing values
-                    df = df.dropna(subset=[count_column])
-                    df[count_column] = df[count_column].astype(int)
-            except Exception:
-                pass
             counts = df[count_column].value_counts().to_dict()
             counts["domain"] = domain
             counts["total"] = len(df)
@@ -94,14 +76,8 @@ def generate_summary_df(soup: BeautifulSoup, count_column: str) -> pd.DataFrame:
     # Store total before dropping the column for the index update
     domain_totals = summary_df['total'].copy()
 
-    # Normalize domain labels: remove any trailing parenthetical (e.g. '(20 problems)')
-    # and append the canonical ' (N)' where N is the computed total.
-    def clean_domain_label(domain_label: str) -> str:
-        # Remove any trailing parenthetical like ' (...)'
-        cleaned = re.sub(r"\s*\([^)]*\)\s*$", "", domain_label).strip()
-        return cleaned
-
-    summary_df.index = [f"{clean_domain_label(d)} ({int(domain_totals.loc[d])})" for d in summary_df.index]
+    # Add total count in parentheses after each domain name
+    summary_df.index = [f"{d} ({domain_totals.loc[d]})" for d in summary_df.index]
 
     # Remove the 'total' column from the data shown
     summary_df = summary_df.drop(columns=["total"])
