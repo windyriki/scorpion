@@ -95,7 +95,7 @@ namespace cost_saturation {
         if (!training_data_file.is_open()) {
             cerr << "Failed to open training data file: " << filename << endl;
         } else {
-            training_data_file << "state; perfect_pattern_collection" << endl;
+            training_data_file << "state_atoms;goal_atoms;perfect_pattern_collection" << endl;
         }
 
         // Print out mapping
@@ -106,10 +106,10 @@ namespace cost_saturation {
         if (!mapping_file.is_open()) {
             cerr << "Failed to open mapping file: " << mapping_filename << endl;
         } else {
-            mapping_file << "id; string" << endl;
+            mapping_file << "id;string" << endl;
         }
         for (size_t i = 0; i < task_proxy.get_variables().size(); ++i) { 
-            mapping_file << i << "; ";           
+            mapping_file << i << ";";           
             mapping_file << task_proxy.get_variables()[i].get_fact(0).get_name().erase(0, 5)<< endl;
         }
 }
@@ -252,15 +252,21 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             if (state_atom.front() == 'N') {
                 continue;
             }
-            if(!first_fact) training_data_file << ", ";
+            if(!first_fact) training_data_file << ",";
+            first_fact = false;
             // training_data_file << i;
             training_data_file << state[i].get_name().erase(0, 5);
         }
-        training_data_file << ", ";
-        for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {            
-            training_data_file << "g_" + task_proxy.get_goals()[i].get_name().erase(0, 5)<< ", ";
+        
+        training_data_file << ";";
+        first_fact = true;
+        for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {
+            if(!first_fact) training_data_file << ", ";
+            first_fact = false;
+            training_data_file << task_proxy.get_goals()[i].get_name().erase(0, 5);
         }
-        training_data_file << "; [";
+        // for (size_t i = 0; i <)
+        training_data_file << ";[";
 
         size_t used_pattern_size = 0;
         bool first_pattern = true;
@@ -270,7 +276,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             if (b_i > 0.5) {
                 num_patterns++;
                 if (!first_pattern) {
-                    training_data_file << ", ";
+                    training_data_file << ",";
                 }
                 first_pattern = false;
                 const Projection *proj = dynamic_cast<const Projection *>(abstractions[i].get());
@@ -284,7 +290,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
                         // training_data_file << var;
                         training_data_file << task_proxy.get_variables()[var].get_fact(0).get_name().erase(0, 5);
                         if (var != pattern.back()) {
-                            training_data_file << ", ";
+                            training_data_file << ",";
                         }   
                     }
                     training_data_file << "]";
@@ -306,7 +312,7 @@ CostPartitioningHeuristic PhO::compute_cost_partitioning(
             if (state_atom.front() == 'N') {
                 continue;
             }
-            if(!first_fact_debug) cout << ", ";
+            if(!first_fact_debug) cout << ", "; //dont print for last fact
             cout << i << " ";
             // Remove "Atom" prefix
             cout << state_atom.erase(0, 5);
