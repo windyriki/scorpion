@@ -10,6 +10,7 @@
 #include "../utils/countdown_timer.h"
 #include "../utils/logging.h"
 #include "../utils/markup.h"
+#include "../utils/system.h"
 #include "../utils/timer.h"
 
 #include <algorithm>
@@ -408,17 +409,22 @@ public:
                 "271-280", "AAAI Press", "2021"));
 
         add_option<int>(
-            "pattern_max_size", "max number of variables per pattern", "1",
-            plugins::Bounds("1", "infinity"));
+            "pattern_max_size", "max number of variables per pattern; use -1 to automatically find the maximum feasible size", "1",
+            plugins::Bounds("-1", "infinity"));
         add_pattern_type_option(*this);
         add_generator_options_to_feature(*this);
     }
 
     virtual shared_ptr<PatternCollectionGeneratorSystematic> create_component(
         const plugins::Options &opts) const override {
+        int pattern_max_size = opts.get<int>("pattern_max_size");
+        if (pattern_max_size == 0) {
+            cerr << "Error: pattern_max_size cannot be 0. Use -1 for automatic selection or a positive integer." << endl;
+            utils::exit_with(utils::ExitCode::SEARCH_INPUT_ERROR);
+        }
         return plugins::make_shared_from_arg_tuples<
             PatternCollectionGeneratorSystematic>(
-            opts.get<int>("pattern_max_size"),
+            pattern_max_size,
             opts.get<PatternType>("pattern_type"),
             get_generator_arguments_from_options(opts));
     }
