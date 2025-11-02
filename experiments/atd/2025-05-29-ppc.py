@@ -41,7 +41,7 @@ if project.REMOTE:
         HOURS = 1
         MIN = 0
         TIME_LIMIT = int(HOURS * 60 + MIN)
-        MEMORY_LIMIT = "8G"
+        MEMORY_LIMIT = "32G"
         SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_TINY
         BUILD += ["-j4"]
     else:
@@ -54,8 +54,9 @@ if project.REMOTE:
         HOURS = 1
         MIN = 0
         TIME_LIMIT = int(HOURS * 60 + MIN)
-        MEMORY_LIMIT = "8G"
-        SUITE = build_suite(project.DOMAINS_DIR, project.SUITE_OPTIMAL_STRIPS)
+        MEMORY_LIMIT = "32G"
+        # SUITE = build_suite(project.DOMAINS_DIR, project.SUITE_OPTIMAL_STRIPS)
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_TINY
         BUILD += ["-j4"]
 else:
     if MANUAL_DEBUG:
@@ -73,7 +74,7 @@ else:
         MIN = 1
         TIME_LIMIT = int(HOURS * 60 + MIN)
         MEMORY_LIMIT = "3G"
-        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_TINY
         GENERATION_TIME = 10
         BUILD += ["-j8"] # core angabe
 
@@ -214,8 +215,21 @@ def process_training_data(mode="other"):
         script_path = REPO / "add_static_and_other_atoms.py"
         output_suffix = "other"
     
-    for run in exp.runs:
-        run_dir = Path(run.path)
+    # Get run directories from the experiment path
+    exp_path = Path(exp.path)
+    if not exp_path.exists():
+        print(f"Experiment directory {exp_path} does not exist. Run steps 1-3 first.")
+        return
+    
+    # Find all run directories
+    run_dirs = [d for d in exp_path.iterdir() if d.is_dir() and d.name.startswith("runs-")]
+    if run_dirs:
+        run_dirs = [d for runs_dir in run_dirs for d in runs_dir.iterdir() if d.is_dir()]
+    else:
+        # Alternative structure: runs directly in exp directory
+        run_dirs = [d for d in exp_path.iterdir() if d.is_dir() and not d.name.startswith(".")]
+    
+    for run_dir in run_dirs:
         if not run_dir.exists():
             continue
             
