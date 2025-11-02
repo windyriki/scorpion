@@ -5,14 +5,27 @@ Add static_atoms and other_atoms columns to the training data CSV.
 - other_atoms: atoms in test_mapping.csv that are not in (static + state + goal)
 """
 
+import argparse
 import csv
 from pathlib import Path
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Add static_atoms and other_atoms columns to training data CSV')
+parser.add_argument('-i', '--input', default='test_ppc_training_data.csv',
+                    help='Input training data CSV file (default: test_ppc_training_data.csv)')
+parser.add_argument('-o', '--output', default='test_ppc_training_data_updated.csv',
+                    help='Output CSV file (default: test_ppc_training_data_updated.csv)')
+parser.add_argument('-s', '--static', default='static-atoms.txt',
+                    help='Static atoms file (default: static-atoms.txt)')
+parser.add_argument('-m', '--mapping', default='test_mapping.csv',
+                    help='Mapping CSV file (default: test_mapping.csv)')
+args = parser.parse_args()
+
 # File paths
-training_data_file = "test_ppc_training_data.csv"
-static_atoms_file = "static-atoms.txt"
-mapping_file = "test_mapping.csv"
-output_file = "test_ppc_training_data_updated.csv"
+training_data_file = args.input
+static_atoms_file = args.static
+mapping_file = args.mapping
+output_file = args.output
 
 # Read static atoms
 static_atoms = set()
@@ -52,7 +65,7 @@ with open(training_data_file, 'r', encoding='utf-8') as f_in:
         writer = csv.writer(f_out, delimiter=';')
         
         # Write new header
-        new_header = ['state_facts', 'goal_facts', 'static_atoms', 'other_atoms', 'perfect_pattern_collection']
+        new_header = ['state_atoms', 'goal_atoms', 'static_atoms', 'other_atoms', 'perfect_pattern_collection']
         writer.writerow(new_header)
         
         row_count = 0
