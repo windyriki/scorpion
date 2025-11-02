@@ -18,6 +18,7 @@ import shutil
 from pathlib import Path
 from functools import partial
 import json
+import subprocess
 from custom_parser import CommonParser
 from labreports import PerTaskComparison
 
@@ -35,21 +36,23 @@ if project.REMOTE:
             email="windy.phung@liu.se",
             extra_options="#SBATCH -A naiss2025-5-382",
             memory_per_cpu="9G",
+            cpus_per_task=4,
         )
-        HOURS = 0
-        MIN = 30
+        HOURS = 1
+        MIN = 0
         TIME_LIMIT = int(HOURS * 60 + MIN)
         MEMORY_LIMIT = "8G"
-        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG
+        SUITE = project.SUITE_OPTIMAL_STRIPS_DEBUG_TINY
         BUILD += ["-j4"]
     else:
         ENV = TetralithEnvironment(
             email="windy.phung@liu.se",
             extra_options="#SBATCH -A naiss2025-5-382",
             memory_per_cpu="9G",
+            cpus_per_task=4,
         )
-        HOURS = 0
-        MIN = 30
+        HOURS = 1
+        MIN = 0
         TIME_LIMIT = int(HOURS * 60 + MIN)
         MEMORY_LIMIT = "8G"
         SUITE = build_suite(project.DOMAINS_DIR, project.SUITE_OPTIMAL_STRIPS)
@@ -96,8 +99,8 @@ def add_search_started(run):
     return run
 
 
-GIT_REV_WLR = "348c4317450c36094585ec9cbc9ef22b9571e03f"
-GIT_REV_WOLR = "348c4317450c36094585ec9cbc9ef22b9571e03f"
+GIT_REV_WLR = "041ab42b62490a90e77f1f9de48d7f8268e31f90"
+GIT_REV_WOLR = "041ab42b62490a90e77f1f9de48d7f8268e31f90"
 exp = FastDownwardExperiment(environment=ENV)
 exp.add_parser(FastDownwardExperiment.EXITCODE_PARSER)
 exp.add_parser(FastDownwardExperiment.TRANSLATOR_PARSER)
@@ -117,21 +120,42 @@ exp.add_resource("", "project.py")
 
 if MANUAL_DEBUG:
     MAX_PATTERN_SIZE_VALUES = [2,4,6]
+    for max_pattern_size_value in MAX_PATTERN_SIZE_VALUES:
+        exp.add_algorithm(
+            f"ppc (max_pattern_size={max_pattern_size_value})",
+            project.SCORPION_DIR,
+            GIT_REV_WLR,
+            [
+                "--translate-options",
+                "--invariant-generation-max-candidates",
+                "0", 
+                "--dump-static-atoms",
+                "--search-options",
+                "--search",
+                f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size={max_pattern_size_value},
+                max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
+                max_time_per_restart=infinity, saturate=false, pattern_type=interesting_general,
+                ignore_useless_patterns=false, store_dead_ends=false))],
+                max_orders=1,samples=1,saturated=true,ppc=true, max_optimization_time=0,diversify=false,
+                output_file="test"),bound=0)"""
+                # output_file="{task_name_safe}"),bound=0)"""
+            ],
+            build_options=BUILD,
+            driver_options=DRIVER,
+        )
 else:
-    MAX_PATTERN_SIZE_VALUES = [2,3,4,5,6,7,8,9,10]
-
-for max_pattern_size_value in MAX_PATTERN_SIZE_VALUES:
     exp.add_algorithm(
-        f"ppc (max_pattern_size={max_pattern_size_value})",
+        f"ppc (max_pattern_size=maximal)",
         project.SCORPION_DIR,
         GIT_REV_WLR,
         [
             "--translate-options",
             "--invariant-generation-max-candidates",
             "0", 
+            "--dump-static-atoms",
             "--search-options",
             "--search",
-            f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size={max_pattern_size_value},
+            f"""astar(pho(abstractions=[projections(sys_scp(max_pattern_size=-1,
             max_pdb_size=infinity, max_collection_size=100M, max_patterns=infinity, max_time=15m,
             max_time_per_restart=infinity, saturate=false, pattern_type=interesting_general,
             ignore_useless_patterns=false, store_dead_ends=false))],
@@ -175,6 +199,59 @@ exp.add_step("build", exp.build)
 exp.add_step("start", exp.start_runs)
 
 exp.add_step("parse", exp.parse)
+
+# Add custom step to process training data for each problem
+def process_training_data(mode="other"):
+    """Call add_static_and_other_atoms.py or add_static_and_all_atoms.py for each run directory.
+    
+    Args:
+        mode: Either "other" or "all" to choose which script to use.
+    """
+    if mode == "all":
+        script_path = REPO / "add_static_and_all_atoms.py"
+        output_suffix = "all"
+    else:
+        script_path = REPO / "add_static_and_other_atoms.py"
+        output_suffix = "other"
+    
+    for run in exp.runs:
+        run_dir = Path(run.path)
+        if not run_dir.exists():
+            continue
+            
+        # Check if required files exist in run directory
+        test_mapping = run_dir / "test_mapping.csv"
+        static_atoms = run_dir / "static-atoms.txt"
+        training_data = run_dir / "test_ppc_training_data.csv"
+        
+        if training_data.exists():
+            output_file = run_dir / f"test_ppc_training_data_updated_{output_suffix}.csv"
+            
+            # Build command
+            cmd = [
+                "python3", str(script_path),
+                "-i", str(training_data),
+                "-o", str(output_file),
+            ]
+            
+            # Add optional file paths if they exist
+            if static_atoms.exists():
+                cmd.extend(["-s", str(static_atoms)])
+            if test_mapping.exists():
+                cmd.extend(["-m", str(test_mapping)])
+            
+            # Run the script
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                print(f"Processed {run_dir.name}: {output_file}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error processing {run_dir.name}: {e}")
+                print(f"stdout: {e.stdout}")
+                print(f"stderr: {e.stderr}")
+
+exp.add_step("process-training-data-other", lambda: process_training_data("other"))
+exp.add_step("process-training-data-all", lambda: process_training_data("all"))
+
 # Add step that collects properties from run directories and
 # writes them to *-eval/properties.
 exp.add_fetcher(name="fetch")
