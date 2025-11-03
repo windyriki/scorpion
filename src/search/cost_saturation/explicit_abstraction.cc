@@ -122,8 +122,9 @@ ExplicitAbstraction::ExplicitAbstraction(
         sort(copied_transitions.begin(), copied_transitions.end());
         assert(utils::is_sorted_unique(copied_transitions));
         // Check that we don't store self-loops.
-        assert(all_of(copied_transitions.begin(), copied_transitions.end(),
-                      [target](const Successor &succ) {return succ.state != target;}));
+        assert(all_of(
+            copied_transitions.begin(), copied_transitions.end(),
+            [target](const Successor &succ) { return succ.state != target; }));
     }
 #endif
 }
@@ -356,7 +357,8 @@ bool ExplicitAbstraction::operator_induces_self_loop(int op_id) const {
     return looping_operators[op_id];
 }
 
-void ExplicitAbstraction::for_each_transition(const TransitionCallback &callback) const {
+void ExplicitAbstraction::for_each_transition(
+    const TransitionCallback &callback) const {
     int num_states = get_num_states();
     for (int target = 0; target < num_states; ++target) {
         for (const Successor &transition : backward_graph[target]) {
@@ -386,9 +388,11 @@ void ExplicitAbstraction::dump() const {
     cout << "States: " << num_states << endl;
     cout << "Goal states: " << goal_states.size() << endl;
     cout << "Operators inducing state-changing transitions: "
-         << count(active_operators.begin(), active_operators.end(), true) << endl;
+         << count(active_operators.begin(), active_operators.end(), true)
+         << endl;
     cout << "Operators inducing self-loops: "
-         << count(looping_operators.begin(), looping_operators.end(), true) << endl;
+         << count(looping_operators.begin(), looping_operators.end(), true)
+         << endl;
 
     vector<bool> is_goal(num_states, false);
     for (int goal : goal_states) {
@@ -410,8 +414,8 @@ void ExplicitAbstraction::dump() const {
         for (const auto &pair : parallel_transitions) {
             int src = pair.first;
             const vector<int> &operators = pair.second;
-            cout << "    " << src << " -> " << target
-                 << " [label = \"" << utils::join(operators, "_") << "\"];" << endl;
+            cout << "    " << src << " -> " << target << " [label = \""
+                 << utils::join(operators, "_") << "\"];" << endl;
         }
     }
     cout << "}" << endl;

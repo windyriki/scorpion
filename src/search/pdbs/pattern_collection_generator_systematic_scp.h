@@ -39,7 +39,8 @@ enum class PatternOrder {
     CG_DOWN,
 };
 
-class PatternCollectionGeneratorSystematicSCP : public PatternCollectionGenerator {
+class PatternCollectionGeneratorSystematicSCP
+    : public PatternCollectionGenerator {
     const int max_pattern_size;
     const int max_pdb_size;
     const int max_collection_size;
@@ -74,10 +75,8 @@ class PatternCollectionGeneratorSystematicSCP : public PatternCollectionGenerato
         priority_queues::AdaptiveQueue<int> &pq,
         const std::shared_ptr<PatternCollection> &patterns,
         const std::shared_ptr<ProjectionCollection> &projections,
-        PatternSet &pattern_set,
-        PatternSet &patterns_checked_for_dead_ends,
-        int64_t &collection_size,
-        double overall_remaining_time);
+        PatternSet &pattern_set, PatternSet &patterns_checked_for_dead_ends,
+        int64_t &collection_size, double overall_remaining_time);
 
     virtual std::string name() const override;
     virtual PatternCollectionInformation compute_patterns(

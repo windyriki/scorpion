@@ -34,21 +34,23 @@ class ExplicitProjectionFactory {
 
     int rank(const UnrankedState &state) const;
     void multiply_out_aux(
-        const std::vector<FactPair> &partial_state,
-        int partial_state_pos,
+        const std::vector<FactPair> &partial_state, int partial_state_pos,
         UnrankedState &state, int state_pos,
         const std::function<void(const UnrankedState &)> &callback) const;
     void multiply_out(
         const std::vector<FactPair> &partial_state,
         const std::function<void(const UnrankedState &)> &callback) const;
 
-    std::vector<ProjectedEffect> get_projected_effects(const OperatorProxy &op) const;
+    std::vector<ProjectedEffect> get_projected_effects(
+        const OperatorProxy &op) const;
     bool conditions_are_satisfied(
-        const std::vector<FactPair> &conditions, const UnrankedState &state_values) const;
-    void add_transition(int src_rank, int op_id, const UnrankedState &dest_values, bool debug = false);
+        const std::vector<FactPair> &conditions,
+        const UnrankedState &state_values) const;
+    void add_transition(
+        int src_rank, int op_id, const UnrankedState &dest_values,
+        bool debug = false);
     void add_transitions(
-        const UnrankedState &src_values,
-        int op_id,
+        const UnrankedState &src_values, int op_id,
         const std::vector<ProjectedEffect> &effects);
     void compute_transitions();
 

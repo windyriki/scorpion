@@ -15,17 +15,17 @@ class Options;
 }
 
 class Evaluator {
-    const std::string description;
-    const bool use_for_reporting_minima;
-    const bool use_for_boosting;
-    const bool use_for_counting_evaluations;
 protected:
+    std::string description;
+    bool use_for_reporting_minima;
+    bool use_for_boosting;
+    bool use_for_counting_evaluations;
     mutable utils::LogProxy log;
 public:
     Evaluator(
         bool use_for_reporting_minima, bool use_for_boosting,
-        bool use_for_counting_evaluations,
-        const std::string &description, utils::Verbosity verbosity);
+        bool use_for_counting_evaluations, const std::string &description,
+        utils::Verbosity verbosity);
     virtual ~Evaluator() = default;
 
     /*
@@ -49,13 +49,11 @@ public:
     virtual void get_path_dependent_evaluators(
         std::set<Evaluator *> &evals) = 0;
 
-
     virtual void notify_initial_state(const State & /*initial_state*/) {
     }
 
     virtual void notify_state_transition(
-        const State & /*parent_state*/,
-        OperatorID /*op_id*/,
+        const State & /*parent_state*/, OperatorID /*op_id*/,
         const State & /*state*/) {
     }
 

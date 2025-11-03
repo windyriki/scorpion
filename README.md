@@ -33,7 +33,7 @@ It accepts the same arguments as the `fast-downward.py` script (see below).
     apptainer build scorpion.sif Apptainer
 
     # Then run the recommended configuration (for solving STRIPS tasks optimally).
-    ./scorpion.sif --transform-task preprocess-h2 --alias scorpion [DOMAIN_FILE] PROBLEM_FILE
+    ./scorpion.sif --preprocess --alias scorpion [DOMAIN_FILE] PROBLEM_FILE
 
 ### Manual compilation
 
@@ -60,34 +60,33 @@ available (heuristics, search algorithms, etc.) and how to use them.
 ### Recommended configurations
 
 In case you want to **solve tasks quickly** and do **not require optimality**,
-we recommend using the first iteration of
-[LAMA](https://www.jair.org/index.php/jair/article/view/10667) with an added
-[type-based open list](https://ojs.aaai.org/index.php/AAAI/article/view/9036/):
+we recommend using [NOLAN](https://mrlab.ai/papers/correa-seipp-icaps2025.pdf):
 
-    ./fast-downward.py \
-      --transform-task preprocess-h2 \
-      [DOMAIN_FILE] PROBLEM_FILE \
-      --search "let(hlm, landmark_sum(lm_reasonable_orders_hps(lm_rhw()), transform=adapt_costs(one)),
-        let(hff, ff(transform=adapt_costs(one)),
-        lazy(alt([single(hff), single(hff, pref_only=true), single(hlm), single(hlm, pref_only=true),
-        type_based([hff, g()])], boost=1000), preferred=[hff, hlm], cost_type=one)))"
-
-For solving **STRIPS tasks optimally**, we recommend using the `--alias scorpion` shortcut
-
-    ./fast-downward.py --transform-task preprocess-h2 --alias scorpion PROBLEM_FILE
+    ./fast-downward.py --preprocess --alias nolan [DOMAIN_FILE] PROBLEM_FILE
 
 which is equivalent to
 
-    ./fast-downward.py \
-      --transform-task preprocess-h2 \
-      [DOMAIN_FILE] PROBLEM_FILE \
+    ./fast-downward.py --preprocess [DOMAIN_FILE] PROBLEM_FILE \
+      --evaluator "hlm=landmark_sum(lm_factory=lm_reasonable_orders_hps(lm_rhw()), transform=adapt_costs(one), pref=false)" \
+      --evaluator "hff=ff(transform=adapt_costs(one))" \
+      --search "lazy(alt([single(hff), single(hff, pref_only=true), single(hlm, pref_only=true),
+        tiebreaking([novelty(width=2, evals=[hlm]), hlm, g()])], boost=1000),
+        preferred=[hff, hlm], cost_type=one, reopen_closed=false)"
+
+For solving **STRIPS tasks optimally**, we recommend using the `--alias scorpion` shortcut
+
+    ./fast-downward.py --preprocess --alias scorpion [DOMAIN_FILE] PROBLEM_FILE
+
+which is equivalent to
+
+    ./fast-downward.py --preprocess [DOMAIN_FILE] PROBLEM_FILE \
       --search "astar(scp_online([
           projections(sys_scp(max_time=100, max_time_per_restart=10)),
           cartesian()],
           saturator=perimstar, max_time=1000, interval=10K, orders=greedy_orders()),
           pruning=limited_pruning(pruning=atom_centric_stubborn_sets(), min_required_pruning_ratio=0.2))"
 
-The `preprocess-h2` call prunes irrelevant operators in a preprocessing
+The `--preprocess` parameter uses h² to prune irrelevant operators and atoms in a preprocessing
 step. The search configuration uses [partial order
 reduction](https://ojs.aaai.org/index.php/SOCS/article/view/18535) and
 maximizes over
@@ -101,14 +100,12 @@ abstractions](https://jair.org/index.php/jair/article/view/11217).
 
 (In [Downward Lab](https://lab.readthedocs.io/) you can use
 `add_algorithm(name="scorpion", repo="path/to/repo", rev="scorpion",
-component_options=[], driver_options=["--transform-task", "preprocess-h2",
+component_options=[], driver_options=["--preprocess",
 "--alias", "scorpion"]` to run the recommended Scorpion configuration.)
 
 For solving **tasks with conditional effects optimally**, we recommend using
 
-    ./fast-downward.py \
-      --transform-task preprocess-h2 \
-      [DOMAIN_FILE] PROBLEM_FILE \
+    ./fast-downward.py --preprocess [DOMAIN_FILE] PROBLEM_FILE \
       --search "astar(scp_online([projections(sys_scp(
             max_time=100, max_time_per_restart=10, max_pdb_size=2M, max_collection_size=20M,
             pattern_type=interesting_non_negative, create_complete_transition_system=true),
@@ -132,10 +129,7 @@ https://github.com/jendrikseipp/scorpion/compare/main...scorpion
 - Scorpion comes with the
   [h²-preprocessor](https://ojs.aaai.org/index.php/ICAPS/article/view/13708)
   by Vidal Alcázar and Álvaro Torralba that prunes irrelevant operators.
-  Pass `--transform-task preprocess-h2` to use it.
-- The `--transform-task` command allows you to run arbitrary preprocessing
-  commands that transform the SAS+ output from the translator before
-  passing it to the search.
+  Pass `--preprocess` to use it.
 - Scorpion uses [incremental search for Cartesian abstraction
   refinement](https://ojs.aaai.org/index.php/ICAPS/article/view/6667).
 - Scorpion uses a
@@ -244,7 +238,13 @@ Different cost partitioning algorithms for landmark heuristics:
   `landmark_cost_partitioning(..., cost_partitioning=saturated, scoring_function=max_heuristic_per_stolen_costs)`
 
 
-## New search engines
+## New evaluators
+
+- Novelty evaluator:
+  `novelty(width=2, evals=[hlm])`
+
+
+## New search algorithms
 
 - Breadth-first search (without overhead of the more general `eager()` search):
   `brfs()`
@@ -264,7 +264,7 @@ Different cost partitioning algorithms for landmark heuristics:
 
 Fast Downward is a domain-independent classical planning system.
 
-Copyright 2003-2024 Fast Downward contributors (see below).
+Copyright 2003-2025 Fast Downward contributors (see below).
 
 For further information:
 - Fast Downward website: <https://www.fast-downward.org>
@@ -274,16 +274,24 @@ For further information:
 
 ## Scientific experiments
 
-We recommend to use the [latest release](https://github.com/aibasel/downward/releases/latest) instead of the tip of the main branch.
-The [Downward Lab](https://lab.readthedocs.io/en/stable/) Python package helps running Fast Downward experiments.
-Our separate [benchmark repository](https://github.com/aibasel/downward-benchmarks) contains a collection of planning tasks.
+We recommend to use the [latest
+release](https://github.com/aibasel/downward/releases/latest) instead
+of the tip of the main branch. The [Downward
+Lab](https://lab.readthedocs.io/en/stable/) Python package helps
+running Fast Downward experiments. Our separate [benchmark
+repository](https://github.com/aibasel/downward-benchmarks) contains a
+collection of planning tasks.
 
 ## Supported software versions
 
-The planner is mainly developed under Linux; and all of its features should work with no restrictions under this platform.
-The planner should compile and run correctly on macOS, but we cannot guarantee that it works as well as under Linux.
-The same comment applies for Windows, where additionally some diagnostic features (e.g., reporting peak memory usage when the planner is terminated by a signal) are not supported.
-Setting time and memory limits and running portfolios is not supported under Windows either.
+The planner is mainly developed under Linux; and all of its features
+should work with no restrictions under this platform. The planner
+should compile and run correctly on macOS, but we cannot guarantee
+that it works as well as under Linux. The same comment applies for
+Windows, where additionally some diagnostic features (e.g., reporting
+peak memory usage when the planner is terminated by a signal) are not
+supported. Setting time and memory limits and running portfolios is
+not supported under Windows either.
 
 This version of Fast Downward has been tested with the following software versions:
 
@@ -314,20 +322,22 @@ Currently, this list is sorted by the last year the person has been
 active, and in case of ties, by the earliest year the person started
 contributing, and finally by last name.
 
-- 2003-2024 Malte Helmert
-- 2008-2016, 2018-2024 Gabriele Roeger
-- 2010-2024 Jendrik Seipp
+- 2003-2025 Malte Helmert
+- 2008-2016, 2018-2025 Gabriele Roeger
+- 2009, 2025 Christian Muise
+- 2010-2025 Jendrik Seipp
+- 2012-2025 Florian Pommerening
+- 2013, 2015-2025 Salomé Eriksson
+- 2021-2025 Clemens Büchner
+- 2022-2025 Remo Christen
+- 2022-2025 Simon Dold
+- 2023-2025 Claudia S. Grundke
+- 2024–2025 Tanja Schindler
+- 2024-2025 David Speck
+- 2025 Travis Rivera Petit
 - 2010-2011, 2013-2024 Silvan Sievers
-- 2012-2024 Florian Pommerening
-- 2013, 2015-2024 Salomé Eriksson
 - 2018-2024 Patrick Ferber
-- 2021-2024 Clemens Büchner
-- 2022-2024 Remo Christen
-- 2023-2024 Simon Dold
-- 2023-2024 Claudia S. Grundke
 - 2024 Martín Pozo
-- 2024 Tanja Schindler
-- 2024 David Speck
 - 2015, 2021-2023 Thomas Keller
 - 2018-2020, 2023 Augusto B. Corrêa
 - 2023 Victor Paléologue
@@ -354,7 +364,6 @@ contributing, and finally by last name.
 - 2011 Raz Nissim
 - 2010 Moritz Goebelbecker
 - 2007-2009 Matthias Westphal
-- 2009 Christian Muise
 
 
 ## History

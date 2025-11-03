@@ -3,7 +3,6 @@
 #include "landmark.h"
 #include "landmark_graph.h"
 #include "landmark_status_manager.h"
-#include "util.h"
 
 #include "../algorithms/max_cliques.h"
 #include "../cost_saturation/greedy_order_utils.h"
@@ -15,8 +14,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <functional>
-#include <iostream>
 #include <limits>
 #include <numeric>
 
@@ -26,32 +23,18 @@ using cost_saturation::ScoringFunction;
 namespace landmarks {
 CostPartitioningAlgorithm::CostPartitioningAlgorithm(
     const vector<int> &operator_costs, const LandmarkGraph &graph)
-    : lm_graph(graph), operator_costs(operator_costs) {
+    : landmark_graph(graph), operator_costs(operator_costs) {
 }
 
-const unordered_set<int> &CostPartitioningAlgorithm::get_achievers(
-    const Landmark &landmark, bool past) const {
+static const unordered_set<int> &get_achievers(
+    const Landmark &landmark, const bool past) {
     // Return relevant achievers of the landmark according to its status.
-    if (past) {
-        return landmark.possible_achievers;
-    } else {
-        return landmark.first_achievers;
-    }
+    return past ? landmark.possible_achievers : landmark.first_achievers;
 }
-
-
-static vector<double> convert_to_double(const vector<int> &int_vec) {
-    vector<double> double_vec(int_vec.begin(), int_vec.end());
-    return double_vec;
-}
-
 
 UniformCostPartitioningAlgorithm::UniformCostPartitioningAlgorithm(
-    const vector<int> &operator_costs,
-    const LandmarkGraph &graph,
-    bool use_action_landmarks,
-    bool reuse_costs,
-    bool greedy,
+    const vector<int> &operator_costs, const LandmarkGraph &graph,
+    bool use_action_landmarks, bool reuse_costs, bool greedy,
     enum cost_saturation::ScoringFunction scoring_function,
     const shared_ptr<utils::RandomNumberGenerator> &rng)
     : CostPartitioningAlgorithm(operator_costs, graph),
@@ -60,7 +43,7 @@ UniformCostPartitioningAlgorithm::UniformCostPartitioningAlgorithm(
       greedy(greedy),
       scoring_function(scoring_function),
       rng(rng),
-      original_costs(convert_to_double(operator_costs)) {
+      original_costs(operator_costs.begin(), operator_costs.end()) {
 }
 
 vector<int> UniformCostPartitioningAlgorithm::compute_landmark_order(
@@ -113,116 +96,120 @@ vector<int> UniformCostPartitioningAlgorithm::compute_landmark_order(
     scores.reserve(achievers_by_lm.size());
     for (size_t i = 0; i < achievers_by_lm.size(); ++i) {
         scores.push_back(cost_saturation::compute_score(
-                             h_values[i], used_costs[i], scoring_function));
+            h_values[i], used_costs[i], scoring_function));
     }
     sort(order.begin(), order.end(), [&](int i, int j) {
-             return scores[i] > scores[j];
-         });
+        return scores[i] > scores[j];
+    });
 
     return order;
 }
 
-double UniformCostPartitioningAlgorithm::get_cost_partitioned_heuristic_value(
-    const LandmarkStatusManager &lm_status_manager,
-    const State &ancestor_state) {
-    vector<int> achieved_lms_by_op(operator_costs.size(), 0);
-    vector<bool> action_landmarks(operator_costs.size(), false);
-
-    const LandmarkGraph::Nodes &nodes = lm_graph.get_nodes();
-    ConstBitsetView past =
-        lm_status_manager.get_past_landmarks(ancestor_state);
-    ConstBitsetView future =
-        lm_status_manager.get_future_landmarks(ancestor_state);
-
-    double h = 0;
-
-    /* First pass:
-       compute which op achieves how many landmarks. Along the way,
-       mark action landmarks and add their cost to h. */
-    for (auto &node : nodes) {
+/* Compute which operator achieves how many landmarks. Along the way, mark
+   action landmarks and sum up their costs. */
+double UniformCostPartitioningAlgorithm::first_pass(
+    vector<int> &landmarks_achieved_by_operator, vector<bool> &action_landmarks,
+    ConstBitsetView &past, ConstBitsetView &future) {
+    double action_landmarks_cost = 0;
+    for (const auto &node : landmark_graph) {
         int id = node->get_id();
         if (future.test(id)) {
             const unordered_set<int> &achievers =
                 get_achievers(node->get_landmark(), past.test(id));
-            if (achievers.empty())
+            if (achievers.empty()) {
                 return numeric_limits<double>::max();
+            }
             if (use_action_landmarks && achievers.size() == 1) {
                 // We have found an action landmark for this state.
                 int op_id = *achievers.begin();
                 if (!action_landmarks[op_id]) {
                     action_landmarks[op_id] = true;
                     assert(utils::in_bounds(op_id, operator_costs));
-                    h += operator_costs[op_id];
+                    action_landmarks_cost += operator_costs[op_id];
                 }
             } else {
                 for (int op_id : achievers) {
-                    assert(utils::in_bounds(op_id, achieved_lms_by_op));
-                    ++achieved_lms_by_op[op_id];
+                    assert(utils::in_bounds(
+                        op_id, landmarks_achieved_by_operator));
+                    ++landmarks_achieved_by_operator[op_id];
                 }
             }
         }
     }
+    return action_landmarks_cost;
+}
 
-    /* TODO: Replace with Landmarks (to do so, we need some way to access the
-        status of a Landmark without access to the ID, which is part of
-        LandmarkNode). */
-    vector<const LandmarkNode *> relevant_lms;
-
-    /* Second pass:
-       remove landmarks from consideration that are covered by
-       an action landmark; decrease the counters accordingly
-       so that no unnecessary cost is assigned to these landmarks. */
-    for (auto &node : nodes) {
+/*
+  Collect all landmarks that are not covered by action landmarks. For all
+  landmarks that are covered, reduce the number of landmarks achieved by their
+  achievers to strengthen the cost partitioning.
+*/
+vector<const LandmarkNode *> UniformCostPartitioningAlgorithm::second_pass(
+    vector<int> &landmarks_achieved_by_operator,
+    const vector<bool> &action_landmarks, ConstBitsetView &past,
+    ConstBitsetView &future) {
+    vector<const LandmarkNode *> uncovered_landmarks;
+    for (const auto &node : landmark_graph) {
         int id = node->get_id();
         if (future.test(id)) {
             const unordered_set<int> &achievers =
                 get_achievers(node->get_landmark(), past.test(id));
-            bool covered_by_action_lm = false;
+            bool covered_by_action_landmark = false;
             for (int op_id : achievers) {
                 assert(utils::in_bounds(op_id, action_landmarks));
                 if (action_landmarks[op_id]) {
-                    covered_by_action_lm = true;
+                    covered_by_action_landmark = true;
                     break;
                 }
             }
-            if (covered_by_action_lm) {
+            if (covered_by_action_landmark) {
                 for (int op_id : achievers) {
-                    assert(utils::in_bounds(op_id, achieved_lms_by_op));
-                    --achieved_lms_by_op[op_id];
+                    assert(utils::in_bounds(
+                        op_id, landmarks_achieved_by_operator));
+                    --landmarks_achieved_by_operator[op_id];
                 }
             } else {
-                relevant_lms.push_back(node.get());
+                uncovered_landmarks.push_back(node.get());
             }
         }
     }
+    return uncovered_landmarks;
+}
 
-    /* Third pass:
-       count shared costs for the remaining landmarks. */
+// Compute the cost partitioning.
+double UniformCostPartitioningAlgorithm::third_pass(
+    const vector<const LandmarkNode *> &uncovered_landmarks,
+    vector<int> &landmarks_achieved_by_operator, ConstBitsetView &past,
+    ConstBitsetView &future) {
+    double cost = 0;
+
     if (reuse_costs || greedy) {
         // UOCP + ZOCP + SCP
         remaining_costs = original_costs;
         vector<vector<int>> achievers_by_lm;
-        achievers_by_lm.reserve(relevant_lms.size());
-        for (const LandmarkNode *node : relevant_lms) {
-            // TODO: Iterate over Landmarks instead of LandmarkNodes
+        achievers_by_lm.reserve(uncovered_landmarks.size());
+        for (const LandmarkNode *node : uncovered_landmarks) {
+            // TODO: Iterate over Landmarks instead of LandmarkNodes.
             int id = node->get_id();
             assert(future.test(id));
-            const unordered_set<int> &achievers = get_achievers(node->get_landmark(), past.test(id));
+            const unordered_set<int> &achievers =
+                get_achievers(node->get_landmark(), past.test(id));
             achievers_by_lm.emplace_back(achievers.begin(), achievers.end());
         }
         for (int lm_id : compute_landmark_order(achievers_by_lm)) {
             const vector<int> &achievers = achievers_by_lm[lm_id];
             double min_cost = numeric_limits<double>::max();
             for (int op_id : achievers) {
-                assert(utils::in_bounds(op_id, achieved_lms_by_op));
-                int num_achieved = achieved_lms_by_op[op_id];
+                assert(utils::in_bounds(op_id, landmarks_achieved_by_operator));
+                int num_achieved = landmarks_achieved_by_operator[op_id];
                 assert(num_achieved >= 1);
                 assert(utils::in_bounds(op_id, remaining_costs));
-                double cost = greedy ? remaining_costs[op_id] :
-                    remaining_costs[op_id] / num_achieved;
-                min_cost = min(min_cost, cost);
+                double partitioned_cost =
+                    greedy ? remaining_costs[op_id]
+                           : remaining_costs[op_id] / num_achieved;
+                min_cost = min(min_cost, partitioned_cost);
             }
-            h += min_cost;
+            cost += min_cost;
             for (int op_id : achievers) {
                 assert(utils::in_bounds(op_id, remaining_costs));
                 double &remaining_cost = remaining_costs[op_id];
@@ -233,39 +220,72 @@ double UniformCostPartitioningAlgorithm::get_cost_partitioned_heuristic_value(
                     remaining_cost = 0.0;
                 }
                 assert(remaining_cost >= 0);
-                --achieved_lms_by_op[op_id];
+                --landmarks_achieved_by_operator[op_id];
             }
         }
     } else {
         // UCP
-        for (const LandmarkNode *node : relevant_lms) {
+        for (const LandmarkNode *node : uncovered_landmarks) {
+            // TODO: Iterate over Landmarks instead of LandmarkNodes.
             int id = node->get_id();
             assert(future.test(id));
-            const unordered_set<int> &achievers = get_achievers(node->get_landmark(), past.test(id));
+            utils::unused_variable(future);
+            const unordered_set<int> &achievers =
+                get_achievers(node->get_landmark(), past.test(id));
             double min_cost = numeric_limits<double>::max();
             for (int op_id : achievers) {
-                assert(utils::in_bounds(op_id, achieved_lms_by_op));
-                int num_achieved = achieved_lms_by_op[op_id];
+                assert(utils::in_bounds(op_id, landmarks_achieved_by_operator));
+                int num_achieved = landmarks_achieved_by_operator[op_id];
                 assert(num_achieved >= 1);
                 assert(utils::in_bounds(op_id, operator_costs));
-                double partitioned_cost = static_cast<double>(operator_costs[op_id]) / num_achieved;
+                double partitioned_cost =
+                    static_cast<double>(operator_costs[op_id]) / num_achieved;
                 min_cost = min(min_cost, partitioned_cost);
             }
-            h += min_cost;
+            cost += min_cost;
         }
     }
-
-    return h;
+    return cost;
 }
 
+double UniformCostPartitioningAlgorithm::get_cost_partitioned_heuristic_value(
+    const LandmarkStatusManager &landmark_status_manager,
+    const State &ancestor_state) {
+    vector<int> landmarks_achieved_by_operator(operator_costs.size(), 0);
+    vector<bool> action_landmarks(operator_costs.size(), false);
+
+    ConstBitsetView past =
+        landmark_status_manager.get_past_landmarks(ancestor_state);
+    ConstBitsetView future =
+        landmark_status_manager.get_future_landmarks(ancestor_state);
+
+    const double cost_of_action_landmarks = first_pass(
+        landmarks_achieved_by_operator, action_landmarks, past, future);
+    if (cost_of_action_landmarks == numeric_limits<double>::max()) {
+        return cost_of_action_landmarks;
+    }
+
+    /*
+      TODO: Use landmarks instead of landmark nodes. To do so, we need
+       some way to access the status of a Landmark without access to the
+       ID which is part of landmark node.
+    */
+    const vector<const LandmarkNode *> uncovered_landmarks = second_pass(
+        landmarks_achieved_by_operator, action_landmarks, past, future);
+
+    const double cost_partitioning_cost = third_pass(
+        uncovered_landmarks, landmarks_achieved_by_operator, past, future);
+
+    return cost_of_action_landmarks + cost_partitioning_cost;
+}
 
 LandmarkCanonicalHeuristic::LandmarkCanonicalHeuristic(
-    const vector<int> &operator_costs,
-    const LandmarkGraph &graph)
+    const vector<int> &operator_costs, const LandmarkGraph &graph)
     : CostPartitioningAlgorithm(operator_costs, graph) {
 }
 
-static bool empty_intersection(const unordered_set<int> &x, const unordered_set<int> &y) {
+static bool empty_intersection(
+    const unordered_set<int> &x, const unordered_set<int> &y) {
     for (int a : x) {
         if (y.find(a) != y.end()) {
             return false;
@@ -286,11 +306,13 @@ vector<vector<int>> LandmarkCanonicalHeuristic::compute_max_additive_subsets(
     for (int i = 0; i < num_landmarks; ++i) {
         const LandmarkNode *lm1 = relevant_landmarks[i];
         int id1 = lm1->get_id();
-        const unordered_set<int> &achievers1 = get_achievers(lm1->get_landmark(), past_landmarks.test(id1));
+        const unordered_set<int> &achievers1 =
+            get_achievers(lm1->get_landmark(), past_landmarks.test(id1));
         for (int j = i + 1; j < num_landmarks; ++j) {
             const LandmarkNode *lm2 = relevant_landmarks[j];
             int id2 = lm2->get_id();
-            const unordered_set<int> &achievers2 = get_achievers(lm2->get_landmark(), past_landmarks.test(id2));
+            const unordered_set<int> &achievers2 =
+                get_achievers(lm2->get_landmark(), past_landmarks.test(id2));
             if (empty_intersection(achievers1, achievers2)) {
                 /* If the two landmarks are additive, there is an edge in the
                    compatibility graph. */
@@ -307,7 +329,8 @@ vector<vector<int>> LandmarkCanonicalHeuristic::compute_max_additive_subsets(
 
 int LandmarkCanonicalHeuristic::compute_minimum_landmark_cost(
     const LandmarkNode &lm_node, bool past) const {
-    const unordered_set<int> &achievers = get_achievers(lm_node.get_landmark(), past);
+    const unordered_set<int> &achievers =
+        get_achievers(lm_node.get_landmark(), past);
     assert(!achievers.empty());
     int min_cost = numeric_limits<int>::max();
     for (int op_id : achievers) {
@@ -320,26 +343,26 @@ int LandmarkCanonicalHeuristic::compute_minimum_landmark_cost(
 double LandmarkCanonicalHeuristic::get_cost_partitioned_heuristic_value(
     const LandmarkStatusManager &lm_status_manager,
     const State &ancestor_state) {
-    ConstBitsetView past =
-        lm_status_manager.get_past_landmarks(ancestor_state);
+    ConstBitsetView past = lm_status_manager.get_past_landmarks(ancestor_state);
     ConstBitsetView future =
         lm_status_manager.get_future_landmarks(ancestor_state);
 
     // Ignore reached landmarks.
     vector<const LandmarkNode *> relevant_landmarks;
-    for (auto &node : lm_graph.get_nodes()) {
+    for (auto &node : landmark_graph) {
         if (future.test(node->get_id())) {
             relevant_landmarks.push_back(node.get());
         }
     }
 
-    vector<vector<int>> max_additive_subsets = compute_max_additive_subsets(
-        past, relevant_landmarks);
+    vector<vector<int>> max_additive_subsets =
+        compute_max_additive_subsets(past, relevant_landmarks);
 
     vector<int> minimum_landmark_costs;
     minimum_landmark_costs.reserve(relevant_landmarks.size());
     for (const LandmarkNode *node : relevant_landmarks) {
-        minimum_landmark_costs.push_back(compute_minimum_landmark_cost(*node, past.test(node->get_id())));
+        minimum_landmark_costs.push_back(
+            compute_minimum_landmark_cost(*node, past.test(node->get_id())));
     }
 
     int max_h = 0;
@@ -357,12 +380,9 @@ double LandmarkCanonicalHeuristic::get_cost_partitioned_heuristic_value(
     return max_h;
 }
 
-
 LandmarkPhO::LandmarkPhO(
-    const vector<int> &operator_costs,
-    const LandmarkGraph &graph,
-    bool saturate,
-    lp::LPSolverType solver_type)
+    const vector<int> &operator_costs, const LandmarkGraph &graph,
+    bool saturate, lp::LPSolverType solver_type)
     : CostPartitioningAlgorithm(operator_costs, graph),
       saturate(saturate),
       lp_solver(solver_type),
@@ -372,7 +392,7 @@ LandmarkPhO::LandmarkPhO(
 lp::LinearProgram LandmarkPhO::build_initial_lp() {
     /* The LP has one variable (column) per landmark and one
        inequality (row) per operator. */
-    int num_cols = lm_graph.get_num_landmarks();
+    int num_cols = landmark_graph.get_num_landmarks();
     int num_rows = operator_costs.size();
 
     // We adapt the variable coefficient and bounds for each state below.
@@ -385,7 +405,8 @@ lp::LinearProgram LandmarkPhO::build_initial_lp() {
       where w_1, w_5, ..., w_k are the weights for the landmarks for which o is
       a relevant achiever.
     */
-    lp_constraints.resize(num_rows, lp::LPConstraint(-lp_solver.get_infinity(), 1.0));
+    lp_constraints.resize(
+        num_rows, lp::LPConstraint(-lp_solver.get_infinity(), 1.0));
     if (saturate) {
         for (int i = 0; i < num_rows; ++i) {
             lp_constraints[i].set_upper_bound(operator_costs[i]);
@@ -395,17 +416,17 @@ lp::LinearProgram LandmarkPhO::build_initial_lp() {
     /* Coefficients of constraints will be updated and recreated in each state.
        We ignore them for the initial LP. */
     return lp::LinearProgram(
-        lp::LPObjectiveSense::MAXIMIZE,
-        move(lp_variables),
-        {},
+        lp::LPObjectiveSense::MAXIMIZE, move(lp_variables), {},
         lp_solver.get_infinity());
 }
 
-double LandmarkPhO::compute_landmark_cost(const LandmarkNode &lm, bool past) const {
+double LandmarkPhO::compute_landmark_cost(
+    const LandmarkNode &lm, bool past) const {
     /* Note that there are landmarks without achievers. Example: not-served(p)
        in miconic:s1-0.pddl. The fact is true in the initial state, and no
        operator achieves it. For such facts, the (infimum) cost is infinity. */
-    const unordered_set<int> &achievers = get_achievers(lm.get_landmark(), past);
+    const unordered_set<int> &achievers =
+        get_achievers(lm.get_landmark(), past);
     double min_cost = lp_solver.get_infinity();
     for (int op_id : achievers) {
         assert(utils::in_bounds(op_id, operator_costs));
@@ -417,8 +438,10 @@ double LandmarkPhO::compute_landmark_cost(const LandmarkNode &lm, bool past) con
 double LandmarkPhO::get_cost_partitioned_heuristic_value(
     const LandmarkStatusManager &lm_status_manager,
     const State &ancestor_state) {
-    const ConstBitsetView past = lm_status_manager.get_past_landmarks(ancestor_state);
-    const ConstBitsetView future = lm_status_manager.get_future_landmarks(ancestor_state);
+    const ConstBitsetView past =
+        lm_status_manager.get_past_landmarks(ancestor_state);
+    const ConstBitsetView future =
+        lm_status_manager.get_future_landmarks(ancestor_state);
     /*
       We want to maximize \sum_i w_i * cost(lm_i) * [lm_i not achieved],
       where cost(lm_i) is the cost of the cheapest operator achieving lm_i.
@@ -427,37 +450,41 @@ double LandmarkPhO::get_cost_partitioned_heuristic_value(
       landmark still has to be reached (again); otherwise it is 0. The lower
       bounds are set to 0 initially and never change.
     */
-    int num_cols = lm_graph.get_num_landmarks();
+    int num_cols = landmark_graph.get_num_landmarks();
     for (int lm_id = 0; lm_id < num_cols; ++lm_id) {
-        const LandmarkNode &lm_node = *lm_graph.get_node(lm_id);
+        const LandmarkNode &lm_node = *landmark_graph.get_node(lm_id);
         double lm_cost = compute_landmark_cost(lm_node, past.test(lm_id));
-        double upper_bound = future.test(lm_id) ? lp_solver.get_infinity() : 0.0;
+        double upper_bound =
+            future.test(lm_id) ? lp_solver.get_infinity() : 0.0;
         auto &lm_var = lp.get_variables()[lm_id];
         lm_var.objective_coefficient = lm_cost;
         lm_var.upper_bound = upper_bound;
     }
 
     /*
-      Define the constraint matrix. The constraints for operator o are of the form
-      w_1 + w_5 + ... + w_k <= 1
-      where w_1, w_5, ..., w_k are the weights for the landmarks for which o is
-      a relevant achiever. Hence, we add a triple (op, lm, 1.0)
-      for each relevant achiever op of landmark lm, denoting that
-      in the op-th row and lm-th column, the matrix has a 1.0 entry.
+      Define the constraint matrix. The constraints for operator o are of the
+      form w_1 + w_5 + ... + w_k <= 1 where w_1, w_5, ..., w_k are the weights
+      for the landmarks for which o is a relevant achiever. Hence, we add a
+      triple (op, lm, 1.0) for each relevant achiever op of landmark lm,
+      denoting that in the op-th row and lm-th column, the matrix has a 1.0
+      entry.
     */
     // Reuse previous constraint objects to save the effort of recreating them.
     for (lp::LPConstraint &constraint : lp_constraints) {
         constraint.clear();
     }
     for (int lm_id = 0; lm_id < num_cols; ++lm_id) {
-        const LandmarkNode &lm = *lm_graph.get_node(lm_id);
+        const LandmarkNode &lm = *landmark_graph.get_node(lm_id);
         if (future.test(lm_id)) {
-            const unordered_set<int> &achievers = get_achievers(lm.get_landmark(), past.test(lm_id));
+            const unordered_set<int> &achievers =
+                get_achievers(lm.get_landmark(), past.test(lm_id));
             if (achievers.empty()) {
                 return numeric_limits<double>::max();
             }
             // The saturated costs are equal to the cost of the landmark.
-            double coeff = saturate ? lp.get_variables()[lm_id].objective_coefficient : 1.0;
+            double coeff = saturate
+                               ? lp.get_variables()[lm_id].objective_coefficient
+                               : 1.0;
             for (int op_id : achievers) {
                 assert(utils::in_bounds(op_id, lp_constraints));
                 lp_constraints[op_id].insert(lm_id, coeff);
@@ -484,7 +511,6 @@ double LandmarkPhO::get_cost_partitioned_heuristic_value(
     return lp_solver.get_objective_value();
 }
 
-
 OptimalCostPartitioningAlgorithm::OptimalCostPartitioningAlgorithm(
     const vector<int> &operator_costs, const LandmarkGraph &graph,
     lp::LPSolverType solver_type)
@@ -496,19 +522,23 @@ OptimalCostPartitioningAlgorithm::OptimalCostPartitioningAlgorithm(
 lp::LinearProgram OptimalCostPartitioningAlgorithm::build_initial_lp() {
     /* The LP has one variable (column) per landmark and one
        inequality (row) per operator. */
-    int num_cols = lm_graph.get_num_landmarks();
-    int num_rows = operator_costs.size();
+    const int num_cols = landmark_graph.get_num_landmarks();
+    const int num_rows = operator_costs.size();
 
     named_vector::NamedVector<lp::LPVariable> lp_variables;
 
-    /* We want to maximize 1 * cost(lm_1) + ... + 1 * cost(lm_n),
-       so the coefficients are all 1.
-       Variable bounds are state-dependent; we initialize the range to {0}. */
+    /*
+      We want to maximize 1 * cost(lm_1) + ... + 1 * cost(lm_n), so the
+      coefficients are all 1.
+      Variable bounds are state-dependent; we initialize the range to {0}.
+    */
     lp_variables.resize(num_cols, lp::LPVariable(0.0, 0.0, 1.0));
 
-    /* Set up lower bounds and upper bounds for the inequalities.
-       These simply say that the operator's total cost must fall
-       between 0 and the real operator cost. */
+    /*
+      Set up lower bounds and upper bounds for the inequalities. These simply
+      say that the operator's total cost must fall between 0 and the real
+      operator cost.
+    */
     lp_constraints.resize(num_rows, lp::LPConstraint(0.0, 0.0));
     for (size_t op_id = 0; op_id < operator_costs.size(); ++op_id) {
         lp_constraints[op_id].set_lower_bound(0);
@@ -517,80 +547,101 @@ lp::LinearProgram OptimalCostPartitioningAlgorithm::build_initial_lp() {
 
     /* Coefficients of constraints will be updated and recreated in each state.
        We ignore them for the initial LP. */
-    return lp::LinearProgram(lp::LPObjectiveSense::MAXIMIZE, move(lp_variables),
-                             {}, lp_solver.get_infinity());
+    return lp::LinearProgram(
+        lp::LPObjectiveSense::MAXIMIZE, move(lp_variables), {},
+        lp_solver.get_infinity());
 }
 
-double OptimalCostPartitioningAlgorithm::get_cost_partitioned_heuristic_value(
-    const LandmarkStatusManager &lm_status_manager,
-    const State &ancestor_state) {
-    /* TODO: We could also do the same thing with action landmarks we
-             do in the uniform cost partitioning case. */
-
-
-    ConstBitsetView past =
-        lm_status_manager.get_past_landmarks(ancestor_state);
-    ConstBitsetView future =
-        lm_status_manager.get_future_landmarks(ancestor_state);
-    /*
-      Set up LP variable bounds for the landmarks.
-      The range of cost(lm_1) is {0} if the landmark is already
-      reached; otherwise it is [0, infinity].
-      The lower bounds are set to 0 in the constructor and never change.
-    */
-    int num_cols = lm_graph.get_num_landmarks();
-    for (int lm_id = 0; lm_id < num_cols; ++lm_id) {
-        if (future.test(lm_id)) {
-            lp.get_variables()[lm_id].upper_bound = lp_solver.get_infinity();
+/*
+  Set up LP variable bounds for the landmarks. The range of cost(lm_1) is {0} if
+  the landmark is already reached; otherwise it is [0, infinity]. The lower
+  bounds are set to 0 in the constructor and never change.
+*/
+void OptimalCostPartitioningAlgorithm::set_lp_bounds(
+    ConstBitsetView &future, const int num_cols) {
+    for (int id = 0; id < num_cols; ++id) {
+        if (future.test(id)) {
+            lp.get_variables()[id].upper_bound = lp_solver.get_infinity();
         } else {
-            lp.get_variables()[lm_id].upper_bound = 0;
+            lp.get_variables()[id].upper_bound = 0;
         }
     }
+}
 
-    /*
-      Define the constraint matrix. The constraints are of the form
-      cost(lm_i1) + cost(lm_i2) + ... + cost(lm_in) <= cost(o)
-      where lm_i1 ... lm_in are the landmarks for which o is a
-      relevant achiever. Hence, we add a triple (op, lm, 1.0)
-      for each relevant achiever op of landmark lm, denoting that
-      in the op-th row and lm-th column, the matrix has a 1.0 entry.
-    */
+/*
+  Define the constraint matrix. The constraints are of the form
+  cost(lm_i1) + cost(lm_i2) + ... + cost(lm_in) <= cost(o)
+  where lm_i1 ... lm_in are the landmarks for which o is a relevant achiever.
+  Hence, we add a triple (op, lm, 1.0) for each relevant achiever op of
+  landmark lm, denoting that in the op-th row and lm-th column, the matrix has
+  a 1.0 entry.
+  Returns true if the current state is a dead-end.
+*/
+bool OptimalCostPartitioningAlgorithm::define_constraint_matrix(
+    ConstBitsetView &past, ConstBitsetView &future, const int num_cols) {
     // Reuse previous constraint objects to save the effort of recreating them.
     for (lp::LPConstraint &constraint : lp_constraints) {
         constraint.clear();
     }
-    for (int lm_id = 0; lm_id < num_cols; ++lm_id) {
-        const Landmark &landmark = lm_graph.get_node(lm_id)->get_landmark();
-        if (future.test(lm_id)) {
+    for (int id = 0; id < num_cols; ++id) {
+        const Landmark &landmark = landmark_graph.get_node(id)->get_landmark();
+        if (future.test(id)) {
             const unordered_set<int> &achievers =
-                get_achievers(landmark, past.test(lm_id));
-            if (achievers.empty())
-                return numeric_limits<double>::max();
+                get_achievers(landmark, past.test(id));
+            /*
+              TODO: We could deal with things more uniformly by just adding a
+               constraint with no variables because there are no achievers
+               (instead of returning here), which would then be detected as an
+               unsolvable constraint by the LP solver. However, as of now this
+               does not work because `get_cost_partitioned_heuristic_value` only
+               adds non-empty constraints to the LP. We should implement this
+               differently, which requires a solution that does not reuse
+               constraints from the previous iteration as it does now.
+            */
+            if (achievers.empty()) {
+                return true;
+            }
             for (int op_id : achievers) {
                 assert(utils::in_bounds(op_id, lp_constraints));
-                lp_constraints[op_id].insert(lm_id, 1.0);
+                lp_constraints[op_id].insert(id, 1.0);
             }
         }
+    }
+    return false;
+}
+
+double OptimalCostPartitioningAlgorithm::get_cost_partitioned_heuristic_value(
+    const LandmarkStatusManager &landmark_status_manager,
+    const State &ancestor_state) {
+    /* TODO: We could also do the same thing with action landmarks we do in the
+        uniform cost partitioning case. */
+
+    ConstBitsetView past =
+        landmark_status_manager.get_past_landmarks(ancestor_state);
+    ConstBitsetView future =
+        landmark_status_manager.get_future_landmarks(ancestor_state);
+
+    const int num_cols = landmark_graph.get_num_landmarks();
+    set_lp_bounds(future, num_cols);
+    const bool dead_end = define_constraint_matrix(past, future, num_cols);
+    if (dead_end) {
+        return numeric_limits<double>::max();
     }
 
     /* Copy non-empty constraints and use those in the LP.
        This significantly speeds up the heuristic calculation. See issue443. */
-    // TODO: do not copy the data here.
+    // TODO: Do not copy the data here.
     lp.get_constraints().clear();
     for (const lp::LPConstraint &constraint : lp_constraints) {
-        if (!constraint.empty())
+        if (!constraint.empty()) {
             lp.get_constraints().push_back(constraint);
+        }
     }
 
-    // Load the problem into the LP solver.
     lp_solver.load_problem(lp);
-
-    // Solve the linear program.
     lp_solver.solve();
 
     assert(lp_solver.has_optimal_solution());
-    double h = lp_solver.get_objective_value();
-
-    return h;
+    return lp_solver.get_objective_value();
 }
 }

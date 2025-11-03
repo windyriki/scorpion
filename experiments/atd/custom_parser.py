@@ -15,93 +15,108 @@ class CommonParser(Parser):
         self.add_pattern (
         "search_start_memory", r"\[t=.+s, (\d+) KB\] g=0, 1 evaluated, 0 expanded", type=int,
         )
-        self.add_indexed_pattern_mapping(
-            r"Total number of transitions in Abstractions \(after label reduction\): (\d+)",
-            type=int,
-            name_mapping=[
-                (0, "cartesian1_num_transitions"),
-                (1, "cartesian2_num_transitions"),
-                (-1, "projection_num_transitions"),
-            ]
+        self.add_pattern (
+        "max_pattern_size", r"Maximum pattern size: (\d+)", type=int
         )
-        self.add_indexed_pattern_mapping(
-            r"Total number of non-label transitions in Abstractions: (\d+)",
-            type=int,
-            name_mapping=[
-                (0, "cartesian1_num_non_label_transitions"),
-                (1, "cartesian2_num_non_label_transitions"),
-                (-1, "projection_num_non_label_transitions"),
-            ]
+        self.add_pattern (
+        "max_pattern_size_in_ppc", r"Maximum used pattern size \(so far\): (\d+)", type=int
         )
-        self.add_indexed_pattern_mapping(
-            r"Total number of label transitions in Abstractions: (\d+)",
-            type=int,
-            name_mapping=[
-                (0, "cartesian1_num_label_transitions"),
-                (1, "cartesian2_num_label_transitions"),
-                (-1, "projection_num_label_transitions"),
-            ]
+        self.add_pattern (
+        "number_patterns_in_ppc", r"  Maximum number of patterns in PPC \(so far\): (\d+)", type=int
         )
-        self.add_indexed_pattern_mapping(
-            r"Total number of labels in Abstractions: (\d+)",
-            type=int,
-            name_mapping=[
-                (0, "cartesian1_num_labels"),
-                (1, "cartesian2_num_labels"),
-                (-1, "projection_num_labels"),
-            ]
+        self.add_pattern (
+        "number_abstract_states", r"  2nd LP objective value \(Number of abstract states\): (\d+)", type=float
         )
-        self.add_indexed_pattern_mapping(
-            r"Total number of reused label transitions in Abstractions: (\d+)",
-            type=int,
-            name_mapping=[
-                (0, "cartesian1_num_reused_labels"),
-                (1, "cartesian2_num_reused_labels"),
-                (-1, "projection_num_reused_labels"),
-            ]
+        self.add_pattern (
+        "number_abstract_states_stored_values", r"Number of abstract states: (\d+)", type=int
         )
-        self.add_sum_pattern ( 
-            "num_transitions", r"Total number of transitions in Abstractions \(after label reduction\): (\d+)", type=int
-        )
-        self.add_bottom_up_pattern ( 
-            "change_in_size", r"Total change in transitions \(\(#non-label transitions\+#label transitions\)/#transitions\): ([\d\.]+)", type=float
-        )
-        self.add_sum_pattern ( 
-            "num_non_label_transitions", r"Total number of non-label transitions in Abstractions: (\d+)", type=int
-        )
-        self.add_sum_pattern ( 
-            "num_label_transitions", r"Total number of label transitions in Abstractions: (\d+)", type=int
-        )
-        self.add_sum_pattern ( 
-            "num_labels", r"Total number of labels in Abstractions: (\d+)", type=int
-        )
-        self.add_sum_pattern ( 
-            "num_reused_labels", r"Total number of reused label transitions in Abstractions: (\d+)", type=int
-        )
-        self.add_label_size_counts_sum_dict()
-        self.add_indexed_json_pattern_mapping(
-            r'Total label size counts: (\{.*?\})',
-            name_mapping=[
-                (0, "cartesian1_label_size_counts"),
-                (1, "cartesian2_label_size_counts"),
-                (-1, "projection_label_size_counts"),
-            ]
-        )
-        self.add_label_size_counts_sum_dict(
-            name="reused_label_size_counts",
-            regex=r'Total reused label size counts: (\{.*?\})'
-        )
-        self.add_indexed_json_pattern_mapping(
-            r'Total reused label size counts: (\{.*?\})',
-            name_mapping=[
-                (0, "cartesian1_reused_label_size_counts"),
-                (1, "cartesian2_reused_label_size_counts"),
-                (-1, "projection_reused_label_size_counts"),
-            ]
-        )
-        self.add_sum_pattern ( 
-            "cp_time", r"Time for computing cost partitionings: (.+)s", type=float
-        )
+        # self.add_indexed_pattern_mapping(
+        #     r"Total number of transitions in Abstractions \(after label reduction\): (\d+)",
+        #     type=int,
+        #     name_mapping=[
+        #         (0, "cartesian1_num_transitions"),
+        #         (1, "cartesian2_num_transitions"),
+        #         (-1, "projection_num_transitions"),
+        #     ]
+        # )
+        # self.add_indexed_pattern_mapping(
+        #     r"Total number of non-label transitions in Abstractions: (\d+)",
+        #     type=int,
+        #     name_mapping=[
+        #         (0, "cartesian1_num_non_label_transitions"),
+        #         (1, "cartesian2_num_non_label_transitions"),
+        #         (-1, "projection_num_non_label_transitions"),
+        #     ]
+        # )
+        # self.add_indexed_pattern_mapping(
+        #     r"Total number of label transitions in Abstractions: (\d+)",
+        #     type=int,
+        #     name_mapping=[
+        #         (0, "cartesian1_num_label_transitions"),
+        #         (1, "cartesian2_num_label_transitions"),
+        #         (-1, "projection_num_label_transitions"),
+        #     ]
+        # )
+        # self.add_indexed_pattern_mapping(
+        #     r"Total number of labels in Abstractions: (\d+)",
+        #     type=int,
+        #     name_mapping=[
+        #         (0, "cartesian1_num_labels"),
+        #         (1, "cartesian2_num_labels"),
+        #         (-1, "projection_num_labels"),
+        #     ]
+        # )
+        # self.add_indexed_pattern_mapping(
+        #     r"Total number of reused label transitions in Abstractions: (\d+)",
+        #     type=int,
+        #     name_mapping=[
+        #         (0, "cartesian1_num_reused_labels"),
+        #         (1, "cartesian2_num_reused_labels"),
+        #         (-1, "projection_num_reused_labels"),
+        #     ]
+        # )
+        # self.add_sum_pattern ( 
+        #     "num_transitions", r"Total number of transitions in Abstractions \(after label reduction\): (\d+)", type=int
+        # )
+        # self.add_bottom_up_pattern ( 
+        #     "change_in_size", r"Total change in transitions \(\(#non-label transitions\+#label transitions\)/#transitions\): ([\d\.]+)", type=float
+        # )
+        # self.add_sum_pattern ( 
+        #     "num_non_label_transitions", r"Total number of non-label transitions in Abstractions: (\d+)", type=int
+        # )
+        # self.add_sum_pattern ( 
+        #     "num_label_transitions", r"Total number of label transitions in Abstractions: (\d+)", type=int
+        # )
+        # self.add_sum_pattern ( 
+        #     "num_labels", r"Total number of labels in Abstractions: (\d+)", type=int
+        # )
+        # self.add_sum_pattern ( 
+        #     "num_reused_labels", r"Total number of reused label transitions in Abstractions: (\d+)", type=int
+        # )
+        # self.add_label_size_counts_sum_dict()
+        # self.add_indexed_json_pattern_mapping(
+        #     r'Total label size counts: (\{.*?\})',
+        #     name_mapping=[
+        #         (0, "cartesian1_label_size_counts"),
+        #         (1, "cartesian2_label_size_counts"),
+        #         (-1, "projection_label_size_counts"),
+        #     ]
+        # )
+        # self.add_label_size_counts_sum_dict(
+        #     name="reused_label_size_counts",
+        #     regex=r'Total reused label size counts: (\{.*?\})'
+        # )
+        # self.add_indexed_json_pattern_mapping(
+        #     r'Total reused label size counts: (\{.*?\})',
+        #     name_mapping=[
+        #         (0, "cartesian1_reused_label_size_counts"),
+        #         (1, "cartesian2_reused_label_size_counts"),
+        #         (-1, "projection_reused_label_size_counts"),
+        #     ]
+        # )
+        # self.add_sum_pattern ( 
+        #     "cp_time", r"Time for computing cost partitionings: (.+)s", type=float
+        # )
         self.add_function(self.search_started)
 
     def _get_flags(self, flags_string):

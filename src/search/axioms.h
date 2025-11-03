@@ -18,9 +18,13 @@ class AxiomEvaluator {
         int effect_var;
         int effect_val;
         AxiomLiteral *effect_literal;
-        AxiomRule(int cond_count, int eff_var, int eff_val, AxiomLiteral *eff_literal)
-            : condition_count(cond_count), unsatisfied_conditions(cond_count),
-              effect_var(eff_var), effect_val(eff_val), effect_literal(eff_literal) {
+        AxiomRule(
+            int cond_count, int eff_var, int eff_val, AxiomLiteral *eff_literal)
+            : condition_count(cond_count),
+              unsatisfied_conditions(cond_count),
+              effect_var(eff_var),
+              effect_val(eff_val),
+              effect_literal(eff_literal) {
         }
     };
     struct NegationByFailureInfo {

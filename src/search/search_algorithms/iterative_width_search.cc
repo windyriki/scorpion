@@ -5,7 +5,6 @@
 #include "../utils/logging.h"
 
 #include <cassert>
-#include <cstdlib>
 
 using namespace std;
 
@@ -14,7 +13,8 @@ IterativeWidthSearch::IterativeWidthSearch(
     int width, OperatorCost cost_type, int bound, double max_time,
     const string &description, utils::Verbosity verbosity)
     : SearchAlgorithm(cost_type, bound, max_time, description, verbosity),
-      novelty_table(task_proxy, width) {
+      task_info(task_proxy),
+      novelty_table(width, task_info) {
     utils::g_log << "Setting up iterative width search." << endl;
 }
 
@@ -31,22 +31,28 @@ void IterativeWidthSearch::initialize() {
 }
 
 bool IterativeWidthSearch::is_novel(const State &state) {
+    state.unpack();
     return novelty_table.compute_novelty_and_update_table(state) < 3;
 }
 
-bool IterativeWidthSearch::is_novel(const OperatorProxy &op, const State &succ_state) {
-    return novelty_table.compute_novelty_and_update_table(op, succ_state) < 3;
+bool IterativeWidthSearch::is_novel(
+    const State &parent_state, const OperatorProxy &op,
+    const State &succ_state) {
+    parent_state.unpack();
+    succ_state.unpack();
+    return novelty_table.compute_novelty_and_update_table(
+               parent_state, op.get_id(), succ_state) < 3;
 }
 
 void IterativeWidthSearch::print_statistics() const {
-    novelty_table.print_statistics();
     statistics.print_detailed_statistics();
     search_space.print_statistics();
 }
 
 SearchStatus IterativeWidthSearch::step() {
     if (open_list.empty()) {
-        utils::g_log << "Completely explored state space -- no solution!" << endl;
+        utils::g_log << "Completely explored state space -- no solution!"
+                     << endl;
         return FAILED;
     }
     StateID id = open_list.front();
@@ -72,7 +78,7 @@ SearchStatus IterativeWidthSearch::step() {
         State succ_state = state_registry.get_successor_state(state, op);
         statistics.inc_generated();
 
-        bool novel = is_novel(op, succ_state);
+        bool novel = is_novel(state, op, succ_state);
 
         if (!novel) {
             continue;
@@ -92,12 +98,14 @@ void IterativeWidthSearch::dump_search_space() const {
 }
 
 class IterativeWidthSearchFeature
-    : public plugins::TypedFeature<SearchAlgorithm, iterative_width_search::IterativeWidthSearch> {
+    : public plugins::TypedFeature<
+          SearchAlgorithm, iterative_width_search::IterativeWidthSearch> {
 public:
     IterativeWidthSearchFeature() : TypedFeature("iw") {
         document_title("Iterated width search");
         add_option<int>(
-            "width", "maximum conjunction size", "2", plugins::Bounds("1", "2"));
+            "width", "maximum conjunction size", "2",
+            plugins::Bounds("1", "2"));
         add_search_algorithm_options_to_feature(*this, "iw");
     }
 

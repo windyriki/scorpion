@@ -15,13 +15,12 @@ struct Successor {
     int op;
     int state;
 
-    Successor(int op, int state)
-        : op(op),
-          state(state) {
+    Successor(int op, int state) : op(op), state(state) {
     }
 
     bool operator<(const Successor &other) const {
-        return std::make_pair(op, state) < std::make_pair(other.op, other.state);
+        return std::make_pair(op, state) <
+               std::make_pair(other.op, other.state);
     }
 
     bool operator>=(const Successor &other) const {
@@ -79,7 +78,8 @@ public:
     virtual int get_num_operators() const override;
     virtual bool operator_is_active(int op_id) const override;
     virtual bool operator_induces_self_loop(int op_id) const override;
-    virtual void for_each_transition(const TransitionCallback &callback) const override;
+    virtual void for_each_transition(
+        const TransitionCallback &callback) const override;
     virtual int get_num_states() const override;
     virtual const std::vector<int> &get_goal_states() const override;
     virtual void dump() const override;
