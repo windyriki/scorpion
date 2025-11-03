@@ -28,21 +28,6 @@ class PhO {
     std::ofstream mapping_file;
     named_vector::NamedVector<lp::LPConstraint> build_lp_constraints(const Abstractions &abstractions, const std::vector<int> &costs) const;
     
-    struct BaseLPComponents {
-        named_vector::NamedVector<lp::LPVariable> variables;
-        named_vector::NamedVector<lp::LPConstraint> constraints;
-    };
-    
-    BaseLPComponents create_base_lp_components(
-        const Abstractions &abstractions,
-        const std::vector<int> &costs,
-        const std::vector<int> &abstract_state_ids,
-        double prev_obj_value,
-        double min_ppc_obj_value,
-        double M,
-        double infinity,
-        int num_abstractions) const;
-    
     void compute_perfect_pattern_collection(
         const Abstractions &abstractions,
         const std::vector<int> &costs,

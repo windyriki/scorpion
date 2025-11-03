@@ -37,56 +37,6 @@ struct hash<std::vector<int>> {
 namespace cost_saturation {
     constexpr size_t ATOM_PREFIX_LEN = 5;
 
-    PhO::BaseLPComponents PhO::create_base_lp_components(
-        const Abstractions &abstractions,
-        const vector<int> &costs,
-        const vector<int> &abstract_state_ids,
-        double prev_obj_value,
-        double min_ppc_obj_value,
-        double M,
-        double infinity,
-        int num_abstractions) const {
-        
-        BaseLPComponents components;
-        
-        // Create variables
-        components.variables.reserve(2 * num_abstractions);
-        for (int i = 0; i < num_abstractions; ++i) {
-            components.variables.emplace_back(0, infinity, 0); 
-        }
-        for (int i = 0; i < num_abstractions; ++i) {
-            components.variables.emplace_back(0, 1, 0, true);
-        }
-        
-        // Build base constraints
-        components.constraints = this->build_lp_constraints(abstractions, costs);
-        
-        // Add constraint: sum_i w_i * h_i == prev_obj_value
-        lp::LPConstraint constraint_w_eq(prev_obj_value, prev_obj_value);
-        for (int i = 0; i < num_abstractions; ++i) {
-            constraint_w_eq.insert(i, h_values_by_abstraction[i][abstract_state_ids[i]]);
-        }
-        components.constraints.push_back(constraint_w_eq);
-        
-        // Add constraints: b_i * M >= w_i for each i
-        for (int i = 0; i < num_abstractions; ++i) {
-            lp::LPConstraint constraint_b(0, infinity);
-            constraint_b.insert(i, -1);
-            constraint_b.insert(num_abstractions + i, M);
-            components.constraints.push_back(constraint_b);
-        }
-        
-        // Add constraint: sum_i N_i * b_i == min_ppc_obj_value (fix to optimal objective)
-        lp::LPConstraint constraint_optimal_size(min_ppc_obj_value, min_ppc_obj_value);
-        for (int i = 0; i < num_abstractions; ++i) {
-            int N_i = abstractions[i]->get_num_states();
-            constraint_optimal_size.insert(num_abstractions + i, N_i);
-        }
-        components.constraints.push_back(constraint_optimal_size);
-        
-        return components;
-    }
-
     named_vector::NamedVector<lp::LPConstraint> PhO::build_lp_constraints(
     const Abstractions &abstractions,
     const vector<int> &costs) const {
@@ -138,8 +88,8 @@ namespace cost_saturation {
             named_vector::NamedVector<lp::LPConstraint> constraints =
                 this->build_lp_constraints(abstractions, costs);
     
-            // Add constraint: sum_i w_i * h_i == prev_obj_value (The optimal heuristic value from the first LP)
-            lp::LPConstraint constraint_w_eq(prev_obj_value, prev_obj_value);
+            // Add constraint: sum_i w_i * h_i >= prev_obj_value (The optimal heuristic value from the first LP)
+            lp::LPConstraint constraint_w_eq(prev_obj_value, infinity);
             for (int i = 0; i < num_abstractions; ++i) {
                 constraint_w_eq.insert(i, h_values_by_abstraction[i][abstract_state_ids[i]]);
             }
@@ -172,7 +122,10 @@ namespace cost_saturation {
             double min_ppc_obj_value = print_lp_solver.get_objective_value();
             cout << "Minimum PPC objective value: " << min_ppc_obj_value << endl;
             
-            // 2. Rebuild the LP with an equality constraint to fix the objective value.
+            // Extract the first solution from the initial LP solve
+            vector<double> first_solution = print_lp_solver.extract_solution();
+            
+            // 2. Rebuild the LP with a bound constraint to fix the objective value.
             named_vector::NamedVector<lp::LPVariable> variables2;
             variables2.reserve(2* num_abstractions);
             for (int i = 0; i < num_abstractions; ++i) {
@@ -185,8 +138,8 @@ namespace cost_saturation {
             named_vector::NamedVector<lp::LPConstraint> constraints2 =
                 this->build_lp_constraints(abstractions, costs);
             
-            // Add constraint: sum_i w_i * h_i == prev_obj_value
-            lp::LPConstraint constraint_w_eq2(prev_obj_value, prev_obj_value);
+            // Add constraint: sum_i w_i * h_i >= prev_obj_value
+            lp::LPConstraint constraint_w_eq2(prev_obj_value, infinity);
             for (int i = 0; i < num_abstractions; ++i) {
                 constraint_w_eq2.insert(i, h_values_by_abstraction[i][abstract_state_ids[i]]);
             }
@@ -200,15 +153,15 @@ namespace cost_saturation {
                 constraints2.push_back(constraint_b2);
             }
             
-            // Add constraint: sum_i N_i * b_i == min_ppc_obj_value (fix to optimal objective)
-            lp::LPConstraint constraint_optimal_size(min_ppc_obj_value, min_ppc_obj_value);
+            // Add constraint: sum_i N_i * b_i <= min_ppc_obj_value (fix to optimal objective)
+            lp::LPConstraint constraint_optimal_size(0, min_ppc_obj_value);
             for (int i = 0; i < num_abstractions; ++i) {
                 int N_i = abstractions[i]->get_num_states();
                 constraint_optimal_size.insert(num_abstractions + i, N_i);
             }
             constraints2.push_back(constraint_optimal_size);
             
-            // Reload the LP with the new constraint
+            // Load the LP once with the constraint (we'll add no-good cuts incrementally)
             lp::LinearProgram new_lp2(
                 lp::LPObjectiveSense::MINIMIZE, std::move(variables2), std::move(constraints2), infinity);
             print_lp_solver.load_problem(new_lp2);
@@ -219,74 +172,85 @@ namespace cost_saturation {
             
             size_t max_pattern_size = 0;
             int max_num_patterns = 0;
-            phmap::flat_hash_set<vector<int>> seen_collections;
+            int num_unique_found = 0;
             
-            // Pre-compute state and goal atoms (before the loop)
-            vector<string> state_atoms;
-            State state = task_proxy.get_initial_state();
-            state_atoms.reserve(state.size());
-            for (size_t i = 0; i < state.size(); ++i) {
-                string state_atom = state[i].get_name();
-                if (state_atom.front() != 'N') {
-                    state_atoms.push_back(state_atom.substr(ATOM_PREFIX_LEN));
+            // Hash-based duplicate detection - only store hashes, not full vectors
+            phmap::flat_hash_set<size_t> seen_hashes;
+            seen_hashes.reserve(std::min(num_solutions, 1000));
+            
+            // Pre-allocate selected_indices workspace
+            vector<int> selected_indices;
+            selected_indices.reserve(num_abstractions);
+            
+            // Pre-compute and cache state and goal atoms to write efficiently
+            // We compute once but write multiple times
+            string state_atoms_str;
+            {
+                State state = task_proxy.get_initial_state();
+                vector<string> state_atoms;
+                state_atoms.reserve(state.size());
+                for (size_t i = 0; i < state.size(); ++i) {
+                    string state_atom = state[i].get_name();
+                    if (state_atom.front() != 'N') {
+                        state_atoms.push_back(state_atom.substr(ATOM_PREFIX_LEN));
+                    }
                 }
-            }
-            sort(state_atoms.begin(), state_atoms.end());
+                sort(state_atoms.begin(), state_atoms.end());
+                
+                // Build the CSV string once
+                for (size_t i = 0; i < state_atoms.size(); ++i) {
+                    if (i > 0) state_atoms_str += ",";
+                    state_atoms_str += state_atoms[i];
+                }
+            } // state_atoms vector freed here
     
-            vector<string> goal_atoms;
-            goal_atoms.reserve(task_proxy.get_goals().size());
-            for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {
-                string goal_name = task_proxy.get_goals()[i].get_name();
-                goal_atoms.push_back(goal_name.substr(ATOM_PREFIX_LEN));
-            }
-            sort(goal_atoms.begin(), goal_atoms.end());
-            
-            // Store all no-good cuts as permanent constraints by rebuilding LP each iteration
-            vector<lp::LPConstraint> all_nogood_cuts;
-            
-            // Create base LP components once before the loop
-            BaseLPComponents base_components = create_base_lp_components(
-                abstractions, costs, abstract_state_ids, prev_obj_value,
-                min_ppc_obj_value, M, infinity, num_abstractions);
+            string goal_atoms_str;
+            {
+                vector<string> goal_atoms;
+                goal_atoms.reserve(task_proxy.get_goals().size());
+                for (size_t i = 0; i < task_proxy.get_goals().size(); ++i) {
+                    string goal_name = task_proxy.get_goals()[i].get_name();
+                    goal_atoms.push_back(goal_name.substr(ATOM_PREFIX_LEN));
+                }
+                sort(goal_atoms.begin(), goal_atoms.end());
+                
+                // Build the CSV string once
+                for (size_t i = 0; i < goal_atoms.size(); ++i) {
+                    if (i > 0) goal_atoms_str += ",";
+                    goal_atoms_str += goal_atoms[i];
+                }
+            } // goal_atoms vector freed here
             
             #ifndef NDEBUG
             vector<double> last_valid_solution;
             #endif
     
             // The iterative loop now finds ALL optimal solutions
-            for (int sol = 0; sol < num_solutions; ++sol) {
+            for (int sol = 0; sol < num_solutions; ++sol) {                
+                vector<double> min_solution;
                 
-                // Copy base components and add accumulated no-good cuts
-                named_vector::NamedVector<lp::LPVariable> variables_iter = base_components.variables;
-                named_vector::NamedVector<lp::LPConstraint> constraints_iter = base_components.constraints;
-                
-                // Add ALL accumulated no-good cuts as permanent constraints
-                for (const auto& cut : all_nogood_cuts) {
-                    constraints_iter.push_back(cut);
+                if (sol == 0) {
+                    // Use the first solution we already computed
+                    min_solution = first_solution;
+                } else {
+                    // Solve LP with accumulated no-good cuts (added incrementally as temporary constraints)
+                    print_lp_solver.solve(); 
+                    
+                    if (!print_lp_solver.has_optimal_solution()) {
+                        // No more solutions exist (either optimal or feasible)
+                        cout << "No more optimal solutions found after " << sol << " iterations." << endl;
+                        break;
+                    }
+        
+                    min_solution = print_lp_solver.extract_solution();
                 }
-                
-                // Reload the LP with all constraints including no-good cuts
-                lp::LinearProgram lp_iter(
-                    lp::LPObjectiveSense::MINIMIZE, std::move(variables_iter), 
-                    std::move(constraints_iter), infinity);
-                print_lp_solver.load_problem(lp_iter);
-                
-                print_lp_solver.solve(); 
-                
-                if (!print_lp_solver.has_optimal_solution()) {
-                    // No more solutions exist (either optimal or feasible)
-                    cout << "No more optimal solutions found after " << sol << " iterations." << endl;
-                    break;
-                }
-    
-                vector<double> min_solution = print_lp_solver.extract_solution();
     
                 #ifndef NDEBUG
                 last_valid_solution = min_solution;
                 #endif
                 
-                // Build sorted vector of selected abstraction indices
-                vector<int> selected_indices;
+                // Build sorted vector of selected abstraction indices (reuse workspace)
+                selected_indices.clear();
                 for (int i = 0; i < num_abstractions; ++i) {
                     if (min_solution[num_abstractions + i] > 0.5) {
                         selected_indices.push_back(i);
@@ -294,13 +258,23 @@ namespace cost_saturation {
                 }
                 sort(selected_indices.begin(), selected_indices.end());
                 
-                // Check uniqueness
-                auto [iter, inserted] = seen_collections.insert(selected_indices);
+                // Compute hash for duplicate detection
+                size_t collection_hash = 0;
+                for (int idx : selected_indices) {
+                    collection_hash = phmap::HashState().combine(collection_hash, idx);
+                }
+                
+                // Check uniqueness using hash
+                auto [iter, inserted] = seen_hashes.insert(collection_hash);
                 
                 if (inserted) {
-                    // Found a unique optimal solution. Process it.
-                    vector<vector<string>> pattern_collections;
-                    pattern_collections.reserve(selected_indices.size());
+                    // Found a unique optimal solution - stream directly to file
+                    num_unique_found++;
+                    
+                    // Build sortable pattern collection for this solution
+                    vector<vector<string>> pattern_collection;
+                    pattern_collection.reserve(selected_indices.size());
+                    
                     for (int idx : selected_indices) {
                         const Projection *proj = dynamic_cast<const Projection *>(abstractions[idx].get());
                         if (proj) {
@@ -308,61 +282,59 @@ namespace cost_saturation {
                             vector<string> pattern_strings;
                             pattern_strings.reserve(pattern.size());
                             for (int var : pattern) {
-                                string var_name = task_proxy.get_variables()[var].get_fact(0).get_name();
-                                pattern_strings.push_back(var_name.substr(ATOM_PREFIX_LEN));
+                                pattern_strings.push_back(
+                                    task_proxy.get_variables()[var].get_fact(0).get_name().substr(ATOM_PREFIX_LEN));
                             }
                             sort(pattern_strings.begin(), pattern_strings.end());
-                            pattern_collections.push_back(move(pattern_strings));
+                            pattern_collection.push_back(move(pattern_strings));
                         }
                     }
-                    sort(pattern_collections.begin(), pattern_collections.end());
+                    sort(pattern_collection.begin(), pattern_collection.end());
     
                     // Update stats
-                    int num_patterns = pattern_collections.size();
+                    int num_patterns = pattern_collection.size();
                     if (num_patterns > max_num_patterns) max_num_patterns = num_patterns;
-                    for (const auto &pattern_strings : pattern_collections) {
+                    for (const auto &pattern_strings : pattern_collection) {
                         if (pattern_strings.size() > max_pattern_size) {
                             max_pattern_size = pattern_strings.size();
                         }
                     }
+
+                    // Print current solution stats with running maximums
+                    cout << "Found unique PPC #" << num_unique_found << ":" << endl;
+                    cout << "  Maximum used pattern size (so far): " << max_pattern_size << endl;
+                    cout << "  Maximum number of patterns in PPC (so far): " << max_num_patterns << endl;
+                    cout << "  2nd LP objective value (Number of abstract states): " << min_ppc_obj_value << endl;
+
+                    // Stream directly to file - no intermediate storage
+                    training_data_file << state_atoms_str << ";";
+                    training_data_file << goal_atoms_str << ";[";
     
-                    // Write to file
-                    bool first = true;
-                    for (const auto &atom : state_atoms) {
-                        if (!first) training_data_file << ",";
-                        first = false;
-                        training_data_file << atom;
-                    }
-                    training_data_file << ";";
-    
-                    first = true;
-                    for (const auto &atom : goal_atoms) {
-                        if (!first) training_data_file << ",";
-                        first = false;
-                        training_data_file << atom;
-                    }
-                    training_data_file << ";[";
-    
-                    for (size_t i = 0; i < pattern_collections.size(); ++i) {
+                    for (size_t i = 0; i < pattern_collection.size(); ++i) {
                         if (i > 0) training_data_file << ",";
                         training_data_file << "[";
-                        for (size_t j = 0; j < pattern_collections[i].size(); ++j) {
+                        for (size_t j = 0; j < pattern_collection[i].size(); ++j) {
                             if (j > 0) training_data_file << ",";
-                            training_data_file << pattern_collections[i][j];
+                            training_data_file << pattern_collection[i][j];
                         }
                         training_data_file << "]";
                     }
                     training_data_file << "]" << endl;
+                    training_data_file.flush();
+                    
+                    // Immediately free memory
+                    pattern_collection.clear();
+                    pattern_collection.shrink_to_fit();
     
                     if (num_unique_solutions_lp != std::numeric_limits<int>::max() &&
-                        (int)seen_collections.size() >= num_unique_solutions_lp) {
-                        cout << "Found " << seen_collections.size() 
+                        num_unique_found >= num_unique_solutions_lp) {
+                        cout << "Found " << num_unique_found 
                             << " unique solutions, stopping LP iterations." << endl;
                         break;
                     }
                 }
                 
-                // Create and store no-good cut to exclude this solution (whether unique or duplicate)
+                // Create no-good cut to exclude this solution
                 // -sum_{i in selected} b_i + sum_{i not in selected} b_i >= 1 - |selected|
                 int num_selected = selected_indices.size();
                 lp::LPConstraint nogood_cut(1 - num_selected, print_lp_solver.get_infinity());
@@ -372,22 +344,32 @@ namespace cost_saturation {
                     } else {
                         nogood_cut.insert(num_abstractions + i, 1);  // b_i
                     }
-                }            
-                all_nogood_cuts.push_back(move(nogood_cut));
+                }
+                
+                // Add this no-good cut incrementally as a temporary constraint
+                {
+                    named_vector::NamedVector<lp::LPConstraint> temp_constraints;
+                    temp_constraints.push_back(move(nogood_cut));
+                    print_lp_solver.add_temporary_constraints(temp_constraints);
+                } // temp_constraints freed here
             }
             
             // Summary output
             cout << "Maximum used pattern size: " << max_pattern_size << endl;
             cout << "Maximum number of patterns in PPC: " << max_num_patterns << endl;
-            cout << "Total unique pattern collections found: " << seen_collections.size() << endl;
+            cout << "Total unique pattern collections found: " << num_unique_found << endl;
+            
+            // Free memory from hash set
+            seen_hashes.clear();
             
             
             #ifndef NDEBUG
-                bool first_fact_debug = true;
-                // Print out facts of the current state
+                // Print out facts of the current state (reconstruct for debug only)
                 cout << "Initial state:" << endl;
-                for (size_t i = 0; i < state.size(); ++i) {
-                    string state_atom = state[i].get_name();
+                State debug_state = task_proxy.get_initial_state();
+                bool first_fact_debug = true;
+                for (size_t i = 0; i < debug_state.size(); ++i) {
+                    string state_atom = debug_state[i].get_name();
                     // Ignore negatedAtoms as they can be implicitly assumed to be false if not present
                     if (state_atom.front() == 'N') {
                         continue;
