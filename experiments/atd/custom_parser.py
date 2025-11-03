@@ -19,13 +19,16 @@ class CommonParser(Parser):
         "max_pattern_size", r"Maximum pattern size: (\d+)", type=int
         )
         self.add_pattern (
-        "max_pattern_size_in_ppc", r"Maximum used pattern size: (\d+)", type=int
+        "max_pattern_size_in_ppc", r"Maximum used pattern size \(so far\): (\d+)", type=int
         )
         self.add_pattern (
-        "number_patterns_in_ppc", r"Number of patterns in PPC: (\d+)", type=int
+        "number_patterns_in_ppc", r"  Maximum number of patterns in PPC \(so far\): (\d+)", type=int
         )
         self.add_pattern (
-        "number_abstract_states", r"Number of abstract states: (\d+)", type=int
+        "number_abstract_states", r"  2nd LP objective value \(Number of abstract states\): (\d+)", type=float
+        )
+        self.add_pattern (
+        "number_abstract_states_stored_values", r"Number of abstract states: (\d+)", type=int
         )
         # self.add_indexed_pattern_mapping(
         #     r"Total number of transitions in Abstractions \(after label reduction\): (\d+)",
